@@ -14,6 +14,17 @@ ios/.symlinks/
 android/.gradle/
 android/app/build/
 
+# Flutter assets
+flutter_*.png
+.DS_Store
+
+# Backend
+backend/node_modules/
+backend/.env
+backend/.env.local
+backend/.env.*.local
+backend/prisma/migrations/*/migration.sql-journal
+
 # Firebase / secrets
 *.json
 *.plist
