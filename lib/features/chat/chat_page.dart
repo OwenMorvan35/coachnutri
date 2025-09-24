@@ -7,6 +7,8 @@ import '../../core/session.dart';
 import 'models/message.dart';
 import 'widgets/message_bubble.dart';
 import 'services/coach_api.dart';
+import 'services/chat_hooks.dart';
+import '../auth/models/auth_session.dart';
 
 /// Chat screen inspired by conversational assistants with mock AI responses.
 class ChatPage extends StatefulWidget {
@@ -30,14 +32,7 @@ class _ChatPageState extends State<ChatPage> {
     _api = CoachApi(tokenProvider: () => sessionController.session?.token);
     Logger.i('CHAT_PAGE', 'ChatPage initState');
     Logger.i('CHAT_PAGE', 'Coach API base URL: ${_api.baseUrl}');
-    _messages.add(
-      Message(
-        role: Role.coach,
-        content:
-            "Bonjour ! Comment puis-je t'aider dans ton parcours nutrition aujourd'hui ?",
-        ts: DateTime.now(),
-      ),
-    );
+    _seedOrLoadHistory();
   }
 
   @override
@@ -47,6 +42,55 @@ class _ChatPageState extends State<ChatPage> {
     _inputController.dispose();
     _api.dispose();
     super.dispose();
+  }
+
+  Future<void> _seedOrLoadHistory() async {
+    try {
+      final history = await _api.fetchHistory(limit: 30);
+      if (!mounted) return;
+      setState(() {
+        if (history.isNotEmpty) {
+          _messages
+            ..clear()
+            ..addAll(history);
+        } else {
+          _messages.add(
+            Message(
+              role: Role.coach,
+              content:
+                  "Bonjour ! Comment puis-je t'aider dans ton parcours nutrition aujourd'hui ?",
+              ts: DateTime.now(),
+            ),
+          );
+        }
+      });
+    } on CoachApiException catch (e) {
+      Logger.w('CHAT_HISTORY', 'History unavailable: ${e.message}');
+      if (!mounted) return;
+      setState(() {
+        _messages.add(
+          Message(
+            role: Role.coach,
+            content:
+                "Bonjour ! Comment puis-je t'aider dans ton parcours nutrition aujourd'hui ?",
+            ts: DateTime.now(),
+          ),
+        );
+      });
+    } catch (e, st) {
+      Logger.e('CHAT_HISTORY', 'Failed to load history', e, st);
+      if (!mounted) return;
+      setState(() {
+        _messages.add(
+          Message(
+            role: Role.coach,
+            content:
+                "Bonjour ! Comment puis-je t'aider dans ton parcours nutrition aujourd'hui ?",
+            ts: DateTime.now(),
+          ),
+        );
+      });
+    }
   }
 
   @override
@@ -160,14 +204,11 @@ class _ChatPageState extends State<ChatPage> {
         return;
       }
 
-      final coachMessage = Message(
-        role: Role.coach,
-        content: response.reply,
-        ts: DateTime.now(),
-      );
+      // Strip any structured JSON (ACTIONS...) from the visible reply
+      final cleaned = _stripStructuredJson(response.reply);
 
       setState(() {
-        _messages.add(coachMessage);
+        _messages.add(Message(role: Role.coach, content: cleaned, ts: DateTime.now()));
         _isSending = false;
       });
       Logger.i(
@@ -175,6 +216,43 @@ class _ChatPageState extends State<ChatPage> {
         'Coach API reply delivered (requestId: ${response.requestId ?? 'n/a'})',
       );
       _scrollToBottom();
+
+      // Handle optional structured payloads from the LLM reply
+      try {
+        final session = SessionScope.of(context, listen: false).session;
+        final userId = session?.user.id ?? '';
+        final tokenProvider = () => session?.token;
+        final obj = ChatHooks.tryParseStructuredPayload(response.reply);
+        final type = (obj?['type'] as String? ?? '').trim();
+        if (userId.isNotEmpty && obj != null && type.isNotEmpty) {
+          if (type == 'recipe_batch') {
+            final List<dynamic> raws = (obj['recipes'] as List?) ?? const [];
+            final titles = raws
+                .whereType<Map<String, dynamic>>()
+                .map((e) => (e['title'] as String? ?? '').trim())
+                .where((t) => t.isNotEmpty)
+                .toList(growable: false);
+            final count = titles.length;
+            final accepted = await _confirmAddRecipes(context, count, titles.take(3).toList());
+            if (accepted == true) {
+              ChatHooks.processStructuredPayloadFromReply(
+                reply: response.reply,
+                userId: userId,
+                tokenProvider: tokenProvider,
+              );
+            }
+          } else if (type == 'shopping_list_update') {
+            // Apply shopping ops silently (no popup), but without showing JSON in chat
+            ChatHooks.processStructuredPayloadFromReply(
+              reply: response.reply,
+              userId: userId,
+              tokenProvider: tokenProvider,
+            );
+          }
+        }
+      } catch (error, stackTrace) {
+        Logger.e('CHAT_HOOK', 'Failed to process structured payload', error, stackTrace);
+      }
     } on CoachApiException catch (error, stackTrace) {
       Logger.e(
         'CHAT_ERROR',
@@ -203,6 +281,44 @@ class _ChatPageState extends State<ChatPage> {
         const SnackBar(content: Text('Une erreur est survenue, réessaie.')),
       );
     }
+  }
+
+  String _stripStructuredJson(String reply) {
+    final text = reply;
+    final upper = text.toUpperCase();
+    final idx = upper.indexOf('ACTIONS');
+    if (idx >= 0) {
+      // Cut everything from the label to the end
+      final before = text.substring(0, idx).trimRight();
+      return before.isEmpty ? '👍 Reçu.' : before;
+    }
+    // Fallback: try to drop trailing JSON object if it starts after some text
+    final startObj = text.indexOf('{');
+    if (startObj > 20) {
+      return text.substring(0, startObj).trimRight();
+    }
+    return text;
+  }
+
+  Future<bool?> _confirmAddRecipes(BuildContext context, int count, List<String> sampleTitles) async {
+    final theme = Theme.of(context);
+    final preview = sampleTitles.isEmpty ? '' : '\n• ' + sampleTitles.join('\n• ');
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ajouter à Mes recettes ?'),
+        content: Text(
+          count <= 1
+              ? 'Ajouter cette recette à Mes recettes ?$preview'
+              : 'Ajouter $count recettes à Mes recettes ?$preview',
+          style: theme.textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Non')),
+          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Ajouter')),
+        ],
+      ),
+    );
   }
 
   List<Map<String, String>> _buildHistoryPayload(List<Message> messages) {

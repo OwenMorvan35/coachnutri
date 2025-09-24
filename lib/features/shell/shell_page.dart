@@ -56,7 +56,7 @@ class _ShellPageState extends State<ShellPage> {
       extendBody: false,
       backgroundColor: Colors.white,
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(96),
+        preferredSize: const Size.fromHeight(80),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -70,12 +70,13 @@ class _ShellPageState extends State<ShellPage> {
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -90,6 +91,8 @@ class _ShellPageState extends State<ShellPage> {
                         Text(
                           'Ton assistant nutrition 100% personnalisé',
                           style: theme.textTheme.bodyMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

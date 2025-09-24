@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../models/message.dart';
 
 class CoachApiException implements Exception {
   const CoachApiException(this.message, [this.cause]);
@@ -31,7 +32,8 @@ class CoachApi {
        _baseUrl = baseUrl ?? _resolveBaseUrl(),
        _tokenProvider = tokenProvider;
 
-  static const Duration _timeout = Duration(seconds: 15);
+  // Increased to reduce premature client timeouts vs server processing
+  static const Duration _timeout = Duration(seconds: 35);
   static const String _envBaseUrl = String.fromEnvironment(
     'COACH_API_BASE_URL',
   );
@@ -41,6 +43,50 @@ class CoachApi {
   final String? Function()? _tokenProvider;
 
   String get baseUrl => _baseUrl;
+
+  Future<List<Message>> fetchHistory({int limit = 30}) async {
+    final uri = Uri.parse('$_baseUrl/coach/history?limit=${limit.clamp(1, 50)}');
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    final token = _tokenProvider?.call();
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    } else {
+      // Without token, no history is available
+      return const <Message>[];
+    }
+
+    http.Response response;
+    try {
+      response = await _client.get(uri, headers: headers).timeout(_timeout);
+    } on TimeoutException catch (error) {
+      throw CoachApiException('La requête a expiré', error);
+    } on http.ClientException catch (error) {
+      throw CoachApiException('Impossible de contacter le serveur', error);
+    } catch (error) {
+      throw CoachApiException('Erreur réseau imprévue', error);
+    }
+
+    if (response.statusCode == 401) {
+      return const <Message>[]; // not authenticated
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw CoachApiException('Réponse invalide du serveur (${response.statusCode})');
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final List<dynamic> arr = (decoded['messages'] as List?) ?? const [];
+    final messages = <Message>[];
+    for (final item in arr) {
+      if (item is! Map<String, dynamic>) continue;
+      final roleStr = (item['role'] as String? ?? '').toLowerCase();
+      final role = roleStr == 'coach' ? Role.coach : Role.user;
+      final content = (item['content'] as String? ?? '').trim();
+      final tsRaw = item['createdAt'] as String?;
+      final ts = tsRaw != null ? DateTime.tryParse(tsRaw) : null;
+      messages.add(Message(role: role, content: content, ts: ts ?? DateTime.now()));
+    }
+    return messages;
+  }
 
   Future<CoachResponse> sendMessage({
     required String message,

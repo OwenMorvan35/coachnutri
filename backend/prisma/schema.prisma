@@ -17,13 +17,21 @@ model User {
 
   recipes       Recipe[]
   shoppingLists ShoppingList[]
+  chatMessages  ChatMessage[]
 }
 
 model Recipe {
   id          String   @id @default(uuid())
+  externalId  String?  @unique
   title       String
   description String?
   steps       String[]
+  imageUrl    String?
+  readyInMin  Int?
+  servings    Int?
+  tags        String[] @default([])
+  ingredientsJson Json?
+  nutrition   Json?
   createdAt   DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id])
@@ -38,4 +46,37 @@ model ShoppingList {
 
   user   User   @relation(fields: [userId], references: [id])
   userId String
+
+  itemsRel ShoppingItem[]
+}
+
+model ShoppingItem {
+  id          String   @id @default(uuid())
+  displayName String
+  nameKey     String
+  qty         Float?
+  unit        String?
+  category    String   @default("autres")
+  note        String?
+  isChecked   Boolean  @default(false)
+  updatedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  list   ShoppingList @relation(fields: [listId], references: [id])
+  listId String
+
+  @@unique([listId, nameKey])
+  @@index([listId, category, isChecked])
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  @@index([userId, createdAt])
 }

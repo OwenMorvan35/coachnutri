@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { config } from '../config.js';
+import { prisma } from '../db/client.js';
+import jwt from 'jsonwebtoken';
+import { requireAuth } from '../middleware/auth.js';
 import { logInfo, logError } from '../logger.js';
 import { validateCoachRequest } from '../utils/validate.js';
 import { callOpenAI, mockReply } from '../services/llm.js';
@@ -23,6 +26,18 @@ const previewMessage = (value) => {
     return null;
   }
   return trimmed.length > 120 ? `${trimmed.slice(0, 120)}…` : trimmed;
+};
+
+const maybeGetUserId = (req) => {
+  try {
+    const auth = req.headers?.authorization || '';
+    const [scheme, token] = auth.split(' ');
+    if (scheme?.toLowerCase() !== 'bearer' || !token) return null;
+    const payload = jwt.verify(token, config.jwtSecret);
+    return payload?.sub || null;
+  } catch (_) {
+    return null;
+  }
 };
 
 coachRouter.post('/', async (req, res, next) => {
@@ -51,9 +66,23 @@ coachRouter.post('/', async (req, res, next) => {
     });
   }
 
-  const trimmedHistory = Array.isArray(data.history) && data.history.length > 0
-    ? data.history.slice(-12)
-    : [];
+  const userId = maybeGetUserId(req);
+  let trimmedHistory = [];
+  if (userId) {
+    // Fetch last 30 messages from DB and map to roles expected by LLM
+    const dbHistDesc = await prisma.chatMessage.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+    const dbHist = dbHistDesc.reverse();
+    trimmedHistory = dbHist.map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
+    }));
+  } else if (Array.isArray(data.history) && data.history.length > 0) {
+    trimmedHistory = data.history.slice(-30);
+  }
 
   const started = Date.now();
 
@@ -87,6 +116,18 @@ coachRouter.post('/', async (req, res, next) => {
       durationMs,
     });
 
+    // Persist messages if authenticated
+    if (userId) {
+      try {
+        await prisma.$transaction([
+          prisma.chatMessage.create({ data: { userId, role: 'user', content: data.message } }),
+          prisma.chatMessage.create({ data: { userId, role: 'assistant', content: llmResult.reply } }),
+        ]);
+      } catch (e) {
+        logError('coachRoute', 'Failed to persist chat messages', e);
+      }
+    }
+
     return res.json({
       reply: llmResult.reply,
       meta: {
@@ -103,5 +144,26 @@ coachRouter.post('/', async (req, res, next) => {
     err.requestId = requestId;
     logError('coachRoute', 'Erreur lors du traitement de la requête coach', err);
     return next(err);
+  }
+});
+
+// Return last N messages for the current user (default 30)
+coachRouter.get('/history', requireAuth, async (req, res, next) => {
+  try {
+    const limit = Math.max(1, Math.min(50, Number.parseInt(req.query.limit, 10) || 30));
+    const rows = await prisma.chatMessage.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+    const messages = rows.map((m) => ({
+      role: m.role === 'assistant' ? 'coach' : 'user',
+      content: m.content,
+      createdAt: m.createdAt,
+    }));
+    res.json({ messages });
+  } catch (error) {
+    logError('coachRoute', 'Failed to fetch history', error);
+    next(error);
   }
 });
