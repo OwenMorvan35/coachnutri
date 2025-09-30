@@ -5,6 +5,7 @@ import '../../core/session.dart';
 import '../chat/chat_page.dart';
 import '../recipes/recipes_page.dart';
 import '../weight/weight_page.dart';
+import '../profile/identity/identity_page.dart';
 import '../../ui/widgets/blurred_nav_bar.dart';
 
 /// Root scaffold handling global navigation and layout.
@@ -35,6 +36,14 @@ class _ShellPageState extends State<ShellPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final sessionController = SessionScope.of(context);
+    final authUser = sessionController.session?.user;
+    final avatarUrl = authUser?.avatarUrl;
+    final initials = (authUser?.displayName ?? authUser?.name ?? authUser?.email ?? 'U')
+        .trim()
+        .isNotEmpty
+        ? (authUser?.displayName ?? authUser?.name ?? authUser?.email ?? 'U')[0].toUpperCase()
+        : 'U';
     final destinations = <NavigationDestination>[
       const NavigationDestination(
         icon: Icon(Icons.restaurant_menu_outlined),
@@ -92,10 +101,19 @@ class _ShellPageState extends State<ShellPage> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  TextButton.icon(
-                    onPressed: () => _handleLogout(context),
-                    icon: const Icon(Icons.logout_rounded),
-                    label: const Text('Déconnexion'),
+                  IconButton(
+                    tooltip: 'Mon profil',
+                    onPressed: () => _openProfile(context),
+                    icon: CircleAvatar(
+                      radius: 20,
+                      backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                      child: avatarUrl == null
+                          ? Text(
+                              initials,
+                              style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
+                            )
+                          : null,
+                    ),
                   ),
                 ],
               ),
@@ -135,8 +153,9 @@ class _ShellPageState extends State<ShellPage> {
     });
   }
 
-  void _handleLogout(BuildContext context) {
-    Logger.i('AUTH', 'User logout');
-    SessionScope.of(context, listen: false).clearSession();
+  void _openProfile(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const IdentityPage()),
+    );
   }
 }

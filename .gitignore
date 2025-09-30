@@ -24,6 +24,7 @@ backend/.env
 backend/.env.local
 backend/.env.*.local
 backend/prisma/migrations/*/migration.sql-journal
+uploads/
 
 # Firebase / secrets
 *.json

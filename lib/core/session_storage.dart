@@ -22,6 +22,8 @@ class SessionStorage {
         id: (m['id'] as String? ?? '').trim(),
         email: (m['email'] as String? ?? '').trim(),
         name: m['name'] as String?,
+        displayName: m['displayName'] as String?,
+        avatarUrl: m['avatarUrl'] as String?,
         createdAt: DateTime.tryParse(m['createdAt'] as String? ?? '') ?? DateTime.now(),
         updatedAt: m['updatedAt'] != null
             ? DateTime.tryParse(m['updatedAt'] as String)
@@ -45,6 +47,8 @@ class SessionStorage {
         'id': session.user.id,
         'email': session.user.email,
         if (session.user.name != null) 'name': session.user.name,
+        if (session.user.displayName != null) 'displayName': session.user.displayName,
+        if (session.user.avatarUrl != null) 'avatarUrl': session.user.avatarUrl,
         'createdAt': session.user.createdAt.toIso8601String(),
         if (session.user.updatedAt != null) 'updatedAt': session.user.updatedAt!.toIso8601String(),
       };
@@ -67,4 +71,3 @@ class SessionStorage {
     }
   }
 }
-

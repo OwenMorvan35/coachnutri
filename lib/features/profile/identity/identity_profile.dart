@@ -1,5 +1,5 @@
-class AuthUser {
-  const AuthUser({
+class IdentityProfile {
+  const IdentityProfile({
     required this.id,
     required this.email,
     required this.createdAt,
@@ -17,13 +17,13 @@ class AuthUser {
   final DateTime createdAt;
   final DateTime? updatedAt;
 
-  AuthUser copyWith({
+  IdentityProfile copyWith({
     String? name,
     String? displayName,
     String? avatarUrl,
     DateTime? updatedAt,
   }) {
-    return AuthUser(
+    return IdentityProfile(
       id: id,
       email: email,
       createdAt: createdAt,
@@ -33,11 +33,18 @@ class AuthUser {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
-}
 
-class AuthSession {
-  const AuthSession({required this.token, required this.user});
-
-  final String token;
-  final AuthUser user;
+  factory IdentityProfile.fromJson(Map<String, dynamic> json) {
+    return IdentityProfile(
+      id: json['id'] as String,
+      email: json['email'] as String,
+      name: json['name'] as String?,
+      displayName: json['displayName'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt'] as String)
+          : null,
+    );
+  }
 }

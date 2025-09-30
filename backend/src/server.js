@@ -3,7 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 
 import { config } from './config.js';
 import { logInfo } from './logger.js';
@@ -16,6 +16,8 @@ import { coachRouter } from './routes/coach.js';
 import { usersRouter } from './routes/users.js';
 import { recipesRouter } from './routes/recipes.js';
 import { shoppingListsRouter } from './routes/shoppingLists.js';
+import { weightsRouter } from './routes/weights.js';
+import { nlpRouter } from './routes/nlp.js';
 import { authRouter } from './routes/auth.js';
 
 const app = express();
@@ -51,6 +53,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
+app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
 
 app.use(healthRouter);
 app.use('/coach', buildCoachRateLimiter(config.rateLimit), coachRouter);
@@ -58,6 +61,8 @@ app.use('/auth', authRouter);
 app.use('/users', usersRouter);
 app.use('/recipes', recipesRouter);
 app.use('/shopping-lists', shoppingListsRouter);
+app.use('/weights', weightsRouter);
+app.use('/nlp', nlpRouter);
 
 app.use(notFound);
 app.use(errorHandler);

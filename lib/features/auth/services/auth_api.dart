@@ -116,6 +116,8 @@ class AuthApi {
         id: userRaw['id'] as String,
         email: userRaw['email'] as String,
         name: userRaw['name'] as String?,
+        displayName: userRaw['displayName'] as String?,
+        avatarUrl: _resolveAvatarUrl(userRaw['avatarUrl'] as String?),
         createdAt: DateTime.parse(userRaw['createdAt'] as String),
         updatedAt: userRaw['updatedAt'] != null
             ? DateTime.tryParse(userRaw['updatedAt'] as String)
@@ -148,5 +150,13 @@ class AuthApi {
     } catch (_) {
       return 'http://localhost:5001';
     }
+  }
+
+  String? _resolveAvatarUrl(String? value) {
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    final baseUri = Uri.parse(_baseUrl);
+    return baseUri.resolve(value).toString();
   }
 }

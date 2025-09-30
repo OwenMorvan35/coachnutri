@@ -12,6 +12,8 @@ import '../../ui/widgets/water_drop_button.dart';
 import 'services/coach_api.dart';
 import 'services/chat_hooks.dart';
 import '../auth/models/auth_session.dart';
+import '../weight/services/weight_api.dart';
+import '../weight/services/weight_repository.dart';
 
 /// Chat screen inspired by conversational assistants with mock AI responses.
 class ChatPage extends StatefulWidget {
@@ -26,6 +28,7 @@ class _ChatPageState extends State<ChatPage> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _inputController = TextEditingController();
   late final CoachApi _api;
+  late final WeightApi _weightApi;
   bool _isSending = false;
 
   @override
@@ -33,6 +36,7 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     final sessionController = SessionScope.of(context, listen: false);
     _api = CoachApi(tokenProvider: () => sessionController.session?.token);
+    _weightApi = WeightApi(tokenProvider: () => sessionController.session?.token);
     Logger.i('CHAT_PAGE', 'ChatPage initState');
     Logger.i('CHAT_PAGE', 'Coach API base URL: ${_api.baseUrl}');
     _seedOrLoadHistory();
@@ -44,6 +48,7 @@ class _ChatPageState extends State<ChatPage> {
     _scrollController.dispose();
     _inputController.dispose();
     _api.dispose();
+    _weightApi.dispose();
     super.dispose();
   }
 
@@ -210,6 +215,15 @@ class _ChatPageState extends State<ChatPage> {
     FocusScope.of(context).unfocus();
 
     try {
+      final handledByWeight = await _maybeHandleWeightCommand(rawInput);
+      if (handledByWeight) {
+        if (!mounted) return;
+        setState(() {
+          _isSending = false;
+        });
+        _scrollToBottom();
+        return;
+      }
       Logger.i('CHAT_REPLY', 'Calling coach API');
       final CoachResponse response = await _api.sendMessage(
         message: rawInput,
@@ -297,6 +311,64 @@ class _ChatPageState extends State<ChatPage> {
         const SnackBar(content: Text('Une erreur est survenue, réessaie.')),
       );
     }
+  }
+
+  Future<bool> _maybeHandleWeightCommand(String text) async {
+    if (!_looksLikeWeightCommand(text)) {
+      return false;
+    }
+    try {
+      final response = await _weightApi.logViaNlp(text);
+      WeightRepository.instance.applyServerEntry(response.entry);
+      if (!mounted) return true;
+      setState(() {
+        _messages.add(
+          Message(role: Role.coach, content: response.message, ts: DateTime.now()),
+        );
+      });
+      return true;
+    } on WeightApiException catch (error) {
+      if (error.statusCode == 400) {
+        return false;
+      }
+      if (!mounted) return true;
+      setState(() {
+        _messages.add(
+          Message(
+            role: Role.coach,
+            content: error.message,
+            ts: DateTime.now(),
+          ),
+        );
+      });
+      return true;
+    } catch (error, stackTrace) {
+      Logger.e('CHAT_WEIGHT', 'Failed to log weight command', error, stackTrace);
+      if (!mounted) return true;
+      setState(() {
+        _messages.add(
+          Message(
+            role: Role.coach,
+            content: 'Oups, je n\'ai pas pu enregistrer la mesure. Réessaie dans un instant.',
+            ts: DateTime.now(),
+          ),
+        );
+      });
+      return true;
+    }
+  }
+
+  bool _looksLikeWeightCommand(String text) {
+    final lower = text.toLowerCase();
+    final weightPattern = RegExp(r'\b\d{2,3}(?:[\.,]\d{1,2})?\s*(kg|kilogrammes?|kilos?)');
+    if (!weightPattern.hasMatch(lower)) {
+      return false;
+    }
+    final datePattern = RegExp(
+      r"(\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\b(hier|aujourd'hui|avant[-\s]?hier|demain|\d{1,2}\s+\p{L}+))",
+      unicode: true,
+    );
+    return datePattern.hasMatch(lower);
   }
 
   String _stripStructuredJson(String reply) {

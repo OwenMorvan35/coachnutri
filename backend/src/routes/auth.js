@@ -48,6 +48,8 @@ const sanitizeUser = (user) => ({
   id: user.id,
   email: user.email,
   name: user.name,
+  displayName: user.displayName,
+  avatarUrl: user.avatarUrl,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
@@ -94,6 +96,7 @@ authRouter.post('/register', async (req, res, next) => {
       data: {
         email: data.email,
         name: data.name ?? null,
+        displayName: data.name ?? data.email.split('@')[0],
         passwordHash,
       },
     });

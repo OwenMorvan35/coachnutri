@@ -1,0 +1,3 @@
+ALTER TABLE "public"."User"
+  ADD COLUMN IF NOT EXISTS "displayName" TEXT,
+  ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT;

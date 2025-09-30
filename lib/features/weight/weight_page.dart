@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/logger.dart';
+import '../../core/session.dart';
+import 'models/weight_models.dart';
+import 'services/weight_api.dart';
+import 'services/weight_repository.dart';
+import 'widgets/add_weight_sheet.dart';
 import 'widgets/weight_chart.dart';
 
-/// Page allowing users to visualise weight evolution with filtering options.
 class WeightPage extends StatefulWidget {
   const WeightPage({super.key});
 
@@ -12,97 +18,295 @@ class WeightPage extends StatefulWidget {
 }
 
 class _WeightPageState extends State<WeightPage> {
-  late final List<_WeightEntry> _entries;
-
-  static const Map<int, String> _monthNames = <int, String>{
-    1: 'Janvier',
-    2: 'Février',
-    3: 'Mars',
-    4: 'Avril',
-    5: 'Mai',
-    6: 'Juin',
-    7: 'Juillet',
-    8: 'Août',
-    9: 'Septembre',
-    10: 'Octobre',
-    11: 'Novembre',
-    12: 'Décembre',
+  late final WeightApi _api;
+  final Map<WeightRange, bool> _loadingRanges = {
+    WeightRange.day: false,
+    WeightRange.week: false,
+    WeightRange.month: false,
+    WeightRange.year: false,
   };
 
-  late int _selectedYear;
-  int? _selectedMonth;
+  WeightRange _selectedRange = WeightRange.week;
+  WeightDataset? _dataset;
+  WeightEntry? _highlighted;
+  bool _loading = true;
+  String? _error;
+  StreamSubscription<WeightDataset>? _subscription;
 
   @override
   void initState() {
     super.initState();
-    Logger.i('WEIGHT_PAGE', 'WeightPage initState');
-    _entries = _seedEntries();
-    final latestEntry = _entries.reduce(
-      (current, next) => next.date.isAfter(current.date) ? next : current,
-    );
-    _selectedYear = latestEntry.date.year;
-    _selectedMonth = latestEntry.date.month;
+    final sessionController = SessionScope.of(context, listen: false);
+    _api = WeightApi(tokenProvider: () => sessionController.session?.token);
+    _listenToRange(_selectedRange);
+    unawaited(_loadRange(_selectedRange, force: true));
   }
 
   @override
   void dispose() {
-    Logger.i('WEIGHT_PAGE', 'WeightPage dispose');
+    _subscription?.cancel();
+    _api.dispose();
     super.dispose();
+  }
+
+  void _listenToRange(WeightRange range) {
+    _subscription?.cancel();
+    _subscription = WeightRepository.instance.watch(range).listen((dataset) {
+      if (!mounted) return;
+      Logger.i('WEIGHT_STREAM', 'Dataset update for ${range.name}: ${dataset.entries.length} points');
+      setState(() {
+        _dataset = dataset;
+        _loading = false;
+        _error = null;
+        _highlighted = dataset.entries.isNotEmpty ? dataset.entries.last : null;
+      });
+    });
+
+    final cached = WeightRepository.instance.getDataset(range);
+    _dataset = cached;
+    _loading = cached == null;
+    _error = null;
+    _highlighted = cached?.entries.isNotEmpty ?? false ? cached!.entries.last : null;
+  }
+
+  Future<void> _loadRange(WeightRange range, {bool force = false}) async {
+    if (_loadingRanges[range] == true) return;
+    final cached = WeightRepository.instance.getDataset(range);
+    if (!force && cached != null) {
+      if (range == _selectedRange && mounted) {
+        setState(() {
+          _dataset = cached;
+          _loading = false;
+          _error = null;
+          _highlighted = cached.entries.isNotEmpty ? cached.entries.last : null;
+        });
+      }
+      return;
+    }
+
+    _loadingRanges[range] = true;
+    if (range == _selectedRange && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final dataset = await _api.fetchRange(range: range);
+      WeightRepository.instance.setDataset(dataset);
+    } on WeightApiException catch (error) {
+      if (range == _selectedRange && mounted) {
+        setState(() {
+          _error = error.message;
+          _loading = false;
+        });
+      }
+    } catch (error) {
+      if (range == _selectedRange && mounted) {
+        setState(() {
+          _error = 'Impossible de charger les mesures.';
+          _loading = false;
+        });
+      }
+    } finally {
+      _loadingRanges[range] = false;
+    }
+  }
+
+  Future<void> _handleRefresh() => _loadRange(_selectedRange, force: true);
+
+  void _onRangeChanged(WeightRange range) {
+    if (_selectedRange == range) return;
+    _selectedRange = range;
+    _listenToRange(range);
+    if (mounted) {
+      setState(() {
+        _dataset = WeightRepository.instance.getDataset(range);
+        _loading = _dataset == null;
+        _error = null;
+        _highlighted = _dataset?.entries.isNotEmpty ?? false ? _dataset!.entries.last : null;
+      });
+    }
+    unawaited(_loadRange(range));
+  }
+
+  Future<void> _handleAddWeight() async {
+    final result = await AddWeightSheet.show(context);
+    if (result == null) return;
+
+    final measurementDate = result.date.toUtc();
+    final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
+    final optimistic = WeightEntry(
+      id: tempId,
+      date: measurementDate,
+      weightKg: result.weightKg,
+      note: result.note,
+      source: WeightEntrySource.manual,
+      createdAt: DateTime.now().toUtc(),
+      updatedAt: DateTime.now().toUtc(),
+      isPending: true,
+    );
+
+    WeightRepository.instance.addOptimisticEntry(optimistic);
+    if (mounted) {
+      setState(() {
+        _highlighted = optimistic;
+      });
+    }
+
+    try {
+      final confirmed = await _api.createEntry(
+        weightKg: result.weightKg,
+        date: measurementDate,
+        note: result.note,
+      );
+      WeightRepository.instance.replaceEntry(tempId, confirmed);
+      if (mounted) {
+        setState(() {
+          _highlighted = confirmed;
+        });
+      }
+      await _loadRange(_selectedRange, force: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mesure enregistrée.')),
+      );
+    } on WeightApiException catch (error) {
+      WeightRepository.instance.removeEntry(tempId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    } catch (error) {
+      WeightRepository.instance.removeEntry(tempId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enregistrement impossible. Vérifie ta connexion.')),
+      );
+    }
+  }
+
+  void _handleHighlight(WeightEntry? entry) {
+    if (!mounted) return;
+    setState(() => _highlighted = entry);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final filtered = _filteredEntries();
-    final chartData = _chartEntriesLastYear();
-
     return Column(
       children: [
-        _buildHeaderCard(theme),
-        const SizedBox(height: 16),
         Expanded(
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              _buildFiltersCard(theme),
-              const SizedBox(height: 16),
-              _buildChartCard(theme, chartData),
-              const SizedBox(height: 16),
-              _buildHistoryCard(theme, filtered),
-              const SizedBox(height: 90),
-            ],
+          child: RefreshIndicator(
+            onRefresh: _handleRefresh,
+            child: _buildScrollable(theme),
           ),
         ),
         SafeArea(
           top: false,
-          minimum: const EdgeInsets.only(top: 8, bottom: 8),
-          child: FilledButton.icon(
-            onPressed: () => _showAddWeightDialog(context),
-            icon: const Icon(Icons.add),
-            label: const Text('Nouvelle mesure'),
+          minimum: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Ajouter mon poids'),
+              onPressed: _handleAddWeight,
+            ),
           ),
         ),
       ],
     );
   }
 
+  Widget _buildScrollable(ThemeData theme) {
+    if (_loading && _dataset == null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 200),
+          Center(child: CircularProgressIndicator()),
+        ],
+      );
+    }
+
+    if (_error != null) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        children: [
+          _buildHeaderCard(theme),
+          const SizedBox(height: 16),
+          _buildRangeSelector(theme),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.wifi_off_rounded, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: theme.textTheme.titleMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => _loadRange(_selectedRange, force: true),
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final entries = _dataset?.entries ?? const <WeightEntry>[];
+    final stats = _dataset?.stats ?? const WeightStats();
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      children: [
+        _buildHeaderCard(theme),
+        const SizedBox(height: 16),
+        _buildRangeSelector(theme),
+        const SizedBox(height: 16),
+        _buildChartCard(theme, entries),
+        const SizedBox(height: 16),
+        _buildStatsRow(theme, stats),
+        const SizedBox(height: 16),
+        _buildHistory(theme, entries),
+        const SizedBox(height: 48),
+      ],
+    );
+  }
+
   Widget _buildHeaderCard(ThemeData theme) {
-    final latest = _entries.isNotEmpty ? _entries.last : null;
-    final latestWeight = latest?.weight;
+    final lastEntry = _dataset?.entries.isNotEmpty ?? false ? _dataset!.entries.last : null;
+    final latestWeight = lastEntry?.weightKg;
+    final subtitle = latestWeight != null
+        ? 'Dernière mesure le ${_formatFullDate(lastEntry!.date)}'
+        : 'Ajoute ta première mesure pour démarrer le suivi.';
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         gradient: const LinearGradient(
-          colors: [Color(0xFF8338EC), Color(0xFFFFBE0B)],
+          colors: [Color(0xFF2563EB), Color(0xFF10B981)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x2A8338EC),
-            offset: Offset(0, 16),
+            color: Color(0x332563EB),
+            offset: Offset(0, 18),
             blurRadius: 32,
           ),
         ],
@@ -110,17 +314,13 @@ class _WeightPageState extends State<WeightPage> {
       child: Row(
         children: [
           Container(
-            height: 54,
-            width: 54,
+            height: 56,
+            width: 56,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.25),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Icon(
-              Icons.monitor_weight_rounded,
-              color: Colors.white,
-              size: 28,
-            ),
+            child: const Icon(Icons.monitor_weight_rounded, color: Colors.white, size: 30),
           ),
           const SizedBox(width: 18),
           Expanded(
@@ -128,19 +328,14 @@ class _WeightPageState extends State<WeightPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Suivi du poids',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  latestWeight != null ? '${_formatWeight(latestWeight)} kg' : 'Suivi du poids',
+                  style: theme.textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  latestWeight != null
-                      ? 'Dernière mesure : ${latestWeight.toStringAsFixed(1)} kg'
-                      : 'Ajoute ta première mesure pour suivre ta progression.',
+                  subtitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Colors.white.withOpacity(0.9),
                   ),
                 ),
               ],
@@ -151,43 +346,25 @@ class _WeightPageState extends State<WeightPage> {
     );
   }
 
-  Widget _buildFiltersCard(ThemeData theme) {
+  Widget _buildRangeSelector(ThemeData theme) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Filtrer mes mesures', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 16),
-            _buildFilters(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChartCard(ThemeData theme, List<_WeightEntry> chartData) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Tendance sur 12 mois', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 220,
-              child: WeightChart(
-                points: chartData
-                    .map(
-                      (entry) => WeightPoint(
-                        date: entry.date,
-                        weight: entry.weight,
-                      ),
-                    )
-                    .toList(),
-              ),
+            Text('Période', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 12),
+            SegmentedButton<WeightRange>(
+              segments: [
+                for (final range in WeightRange.values)
+                  ButtonSegment<WeightRange>(
+                    value: range,
+                    label: Text(range.label),
+                  ),
+              ],
+              selected: <WeightRange>{_selectedRange},
+              onSelectionChanged: (selection) => _onRangeChanged(selection.first),
             ),
           ],
         ),
@@ -195,26 +372,113 @@ class _WeightPageState extends State<WeightPage> {
     );
   }
 
-  Widget _buildHistoryCard(ThemeData theme, List<_WeightEntry> entries) {
+  Widget _buildChartCard(ThemeData theme, List<WeightEntry> entries) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Progression', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 240,
+              child: entries.isEmpty
+                  ? const Center(child: Text('Aucune donnée pour cette période.'))
+                  : WeightChart(
+                      entries: entries,
+                      range: _selectedRange,
+                      highlighted: _highlighted,
+                      onEntryFocus: _handleHighlight,
+                    ),
+            ),
+            if (_highlighted != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.bolt_rounded, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${_formatFullDate(_highlighted!.date)} • ${_formatWeight(_highlighted!.weightKg)} kg',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsRow(ThemeData theme, WeightStats stats) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: Row(
+          children: [
+            _buildStatTile(theme, 'Dernier', stats.latest),
+            _buildDivider(),
+            _buildStatTile(theme, 'Minimum', stats.min),
+            _buildDivider(),
+            _buildStatTile(theme, 'Maximum', stats.max),
+            _buildDivider(),
+            _buildStatTile(theme, 'Moyenne', stats.average),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatTile(ThemeData theme, String label, double? value) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Text(
+            value != null ? '${_formatWeight(value)} kg' : '--',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivider() => SizedBox(
+        height: 40,
+        child: VerticalDivider(color: Colors.grey.withOpacity(0.3)),
+      );
+
+  Widget _buildHistory(ThemeData theme, List<WeightEntry> entries) {
     if (entries.isEmpty) {
       return Card(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.insights_outlined, size: 48, color: theme.colorScheme.primary),
+              Icon(Icons.insert_chart_outlined, size: 48, color: theme.colorScheme.primary),
               const SizedBox(height: 12),
               Text(
                 'Aucune mesure pour cette période',
-                style: theme.textTheme.titleSmall,
+                style: theme.textTheme.titleMedium,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
-                'Enregistre ton poids pour visualiser ta progression.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                'Ajoute un poids ou demande au coach de le faire pour toi.',
                 textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -223,290 +487,53 @@ class _WeightPageState extends State<WeightPage> {
     }
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          children: [
-            for (final entry in entries)
-              ListTile(
-                leading: Container(
-                  height: 42,
-                  width: 42,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(Icons.trending_up_rounded, color: theme.colorScheme.primary),
-                ),
-                title: Text(
-                  '${entry.weight.toStringAsFixed(1)} kg',
-                  style: theme.textTheme.titleSmall,
-                ),
-                subtitle: Text(
-                  _formatDate(entry.date),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ),
-          ],
-        ),
+      child: ListView.separated(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        itemCount: entries.length,
+        separatorBuilder: (_, __) => Divider(height: 1, color: theme.dividerColor.withOpacity(0.2)),
+        itemBuilder: (context, index) {
+          final entry = entries.reversed.elementAt(index);
+          return ListTile(
+            leading: _buildSourceAvatar(theme, entry),
+            title: Text('${_formatWeight(entry.weightKg)} kg', style: theme.textTheme.titleMedium),
+            subtitle: Text(_formatFullDate(entry.date)),
+            trailing: entry.isPending
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                : null,
+          );
+        },
       ),
     );
   }
 
-  Widget _buildFilters() {
-    final availableYears = _entries.map((e) => e.date.year).toSet().toList()
-      ..sort();
-    final availableMonths = _entries
-        .where((entry) => entry.date.year == _selectedYear)
-        .map((entry) => entry.date.month)
-        .toSet()
-        .toList()
-      ..sort();
-    final selectedYear = availableYears.contains(_selectedYear) && availableYears.isNotEmpty
-        ? _selectedYear
-        : (availableYears.isNotEmpty ? availableYears.last : _selectedYear);
-    final selectedMonth = (_selectedMonth != null && availableMonths.contains(_selectedMonth))
-        ? _selectedMonth
-        : null;
-
-    final theme = Theme.of(context);
-
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Année', style: theme.textTheme.labelLarge),
-              const SizedBox(height: 4),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButton<int>(
-                  isExpanded: true,
-                  value: selectedYear,
-                  underline: const SizedBox.shrink(),
-                  items: availableYears
-                      .map(
-                        (year) => DropdownMenuItem<int>(
-                          value: year,
-                          child: Text(year.toString()),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) {
-                      return;
-                    }
-                    Logger.i('WEIGHT_FILTER', 'Year changed to $value');
-                    setState(() {
-                      _selectedYear = value;
-                      if (!_hasEntriesForMonth(value, _selectedMonth)) {
-                        _selectedMonth = null;
-                      }
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Mois', style: theme.textTheme.labelLarge),
-              const SizedBox(height: 4),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButton<int?>(
-                  isExpanded: true,
-                  value: selectedMonth,
-                  underline: const SizedBox.shrink(),
-                  items: <DropdownMenuItem<int?>>[
-                    const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('Année complète'),
-                    ),
-                    ...availableMonths.map(
-                      (month) => DropdownMenuItem<int?>(
-                        value: month,
-                        child: Text(_monthNames[month] ?? 'Mois $month'),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    Logger.i('WEIGHT_FILTER', 'Month changed to ${value ?? 'full year'}');
-                    setState(() {
-                      _selectedMonth = value;
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+  Widget _buildSourceAvatar(ThemeData theme, WeightEntry entry) {
+    final color = switch (entry.source) {
+      WeightEntrySource.ai => theme.colorScheme.primary,
+      WeightEntrySource.import => theme.colorScheme.tertiary,
+      _ => theme.colorScheme.secondary,
+    };
+    final icon = switch (entry.source) {
+      WeightEntrySource.ai => Icons.smart_toy_outlined,
+      WeightEntrySource.import => Icons.download_done_rounded,
+      _ => Icons.edit_note_rounded,
+    };
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: color.withOpacity(0.15),
+      child: Icon(icon, color: color),
     );
   }
 
-  List<_WeightEntry> _filteredEntries() {
-    final filtered = _entries.where((entry) {
-      final matchesYear = entry.date.year == _selectedYear;
-      final matchesMonth = _selectedMonth == null || entry.date.month == _selectedMonth;
-      return matchesYear && matchesMonth;
-    }).toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    return filtered;
+  String _formatWeight(double value) => value.toStringAsFixed(1).replaceAll('.', ',');
+
+  String _formatFullDate(DateTime date) {
+    final local = date.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final year = local.year.toString();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day/$month/$year à $hour:$minute';
   }
-
-  List<_WeightEntry> _chartEntriesLastYear() {
-    if (_entries.isEmpty) {
-      return const [];
-    }
-    final latest = _entries.reduce(
-      (current, next) => next.date.isAfter(current.date) ? next : current,
-    );
-    final start = DateTime(latest.date.year, latest.date.month - 11, 1);
-
-    // Precompute monthly averages for all recorded months.
-    final grouped = <String, List<_WeightEntry>>{};
-    for (final entry in _entries) {
-      final key = '${entry.date.year}-${entry.date.month}';
-      grouped.putIfAbsent(key, () => <_WeightEntry>[]).add(entry);
-    }
-
-    final List<_WeightEntry> points = <_WeightEntry>[];
-    double? lastKnownWeight;
-
-    // Determine last known weight before the start range to keep continuity.
-    final previous = _entries
-        .where((entry) => entry.date.isBefore(start))
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
-    if (previous.isNotEmpty) {
-      lastKnownWeight = previous.first.weight;
-    }
-
-    for (var i = 0; i < 12; i++) {
-      final monthDate = DateTime(start.year, start.month + i, 15);
-      final key = '${monthDate.year}-${monthDate.month}';
-      final monthlyEntries = grouped[key];
-      if (monthlyEntries != null && monthlyEntries.isNotEmpty) {
-        final avgWeight = monthlyEntries
-                .map((entry) => entry.weight)
-                .reduce((value, element) => value + element) /
-            monthlyEntries.length;
-        lastKnownWeight = avgWeight;
-      }
-
-      if (lastKnownWeight != null) {
-        points.add(
-          _WeightEntry(date: monthDate, weight: double.parse(lastKnownWeight.toStringAsFixed(1))),
-        );
-      }
-    }
-
-    return points;
-  }
-
-  bool _hasEntriesForMonth(int year, int? month) {
-    if (month == null) {
-      return true;
-    }
-    return _entries.any((entry) => entry.date.year == year && entry.date.month == month);
-  }
-
-  List<_WeightEntry> _seedEntries() {
-    final now = DateTime.now();
-    final List<_WeightEntry> generated = <_WeightEntry>[];
-    var currentWeight = 75.0;
-    final randomFluctuations = <double>[0.0, -0.4, -0.2, -0.5, 0.1, -0.3, 0.0, -0.6, -0.2, -0.4, -0.1, -0.3];
-    for (var i = 11; i >= 0; i--) {
-      final date = DateTime(now.year, now.month - i, 15);
-      currentWeight += randomFluctuations[11 - i];
-      generated.add(
-        _WeightEntry(
-          date: date,
-          weight: double.parse(currentWeight.toStringAsFixed(1)),
-        ),
-      );
-    }
-    return generated;
-  }
-
-  Future<void> _showAddWeightDialog(BuildContext dialogContext) async {
-    final controller = TextEditingController();
-    Logger.i('WEIGHT_ADD', 'Open add weight dialog');
-    final result = await showDialog<String>(
-      context: dialogContext,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Ajouter un poids'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(hintText: 'Ex: 71.5'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Annuler'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-              child: const Text('Valider'),
-            ),
-          ],
-        );
-      },
-    );
-
-    controller.dispose();
-
-    if (!mounted) {
-      return;
-    }
-
-    if (result == null) {
-      Logger.i('WEIGHT_ADD', 'Dialog cancelled');
-      return;
-    }
-
-    final parsed = double.tryParse(result.replaceAll(',', '.'));
-    if (parsed == null) {
-      Logger.w('WEIGHT_ADD', 'Invalid weight input: $result');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Valeur invalide. Utilise un nombre.')),
-      );
-      return;
-    }
-
-    final newEntry = _WeightEntry(date: DateTime.now(), weight: parsed);
-    setState(() {
-      _entries.insert(0, newEntry);
-      _selectedYear = newEntry.date.year;
-      _selectedMonth = newEntry.date.month;
-    });
-    Logger.i('WEIGHT_ADD', 'Added new weight: ${parsed.toStringAsFixed(1)} kg');
-  }
-
-  String _formatDate(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    final year = date.year.toString();
-    return '$day/$month/$year';
-  }
-}
-
-class _WeightEntry {
-  const _WeightEntry({required this.date, required this.weight});
-
-  final DateTime date;
-  final double weight;
 }

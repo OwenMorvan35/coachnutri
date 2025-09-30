@@ -23,6 +23,17 @@ class SessionController extends ChangeNotifier {
     _storage.clear();
     notifyListeners();
   }
+
+  void updateUser(AuthUser user) {
+    final current = _session;
+    if (current == null) {
+      return;
+    }
+    final updated = AuthSession(token: current.token, user: user);
+    _session = updated;
+    _storage.save(updated);
+    notifyListeners();
+  }
 }
 
 class SessionScope extends InheritedNotifier<SessionController> {
