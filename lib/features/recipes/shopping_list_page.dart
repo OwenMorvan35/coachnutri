@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/session.dart';
+import '../../ui/widgets/glass_card.dart';
 import 'models/shopping_item.dart';
 import 'services/shopping_api.dart';
 import 'services/shopping_list_repository.dart';
@@ -86,17 +87,19 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
         child: Text(_labelFor(categoryKey), style: theme.textTheme.titleSmall),
       ));
       widgets.add(
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: filtered
-              .map((e) => _ItemCard(
-                    item: e,
-                    isInCart: inCart,
-                    onToggle: () => _toggleItem(e.nameKey),
-                    onRemove: () => _removeItem(e.nameKey),
-                  ))
-              .toList(),
+        GlassCard(
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: filtered
+                .map((e) => _ItemCard(
+                      item: e,
+                      isInCart: inCart,
+                      onToggle: () => _toggleItem(e.nameKey),
+                      onRemove: () => _removeItem(e.nameKey),
+                    ))
+                .toList(),
+          ),
         ),
       );
     });
@@ -119,8 +122,6 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
             controller: _controller,
             decoration: const InputDecoration(
               hintText: 'Ajouter un article…',
-              border: OutlineInputBorder(),
-              isDense: true,
             ),
             onSubmitted: (_) => _addQuick(),
           ),

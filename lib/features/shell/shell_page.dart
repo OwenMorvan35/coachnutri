@@ -5,6 +5,7 @@ import '../../core/session.dart';
 import '../chat/chat_page.dart';
 import '../recipes/recipes_page.dart';
 import '../weight/weight_page.dart';
+import '../../ui/widgets/blurred_nav_bar.dart';
 
 /// Root scaffold handling global navigation and layout.
 class ShellPage extends StatefulWidget {
@@ -54,18 +55,11 @@ class _ShellPageState extends State<ShellPage> {
 
     return Scaffold(
       extendBody: false,
-      backgroundColor: Colors.white,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(80),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(
-              bottom: BorderSide(
-                color: theme.colorScheme.outlineVariant,
-                width: 1,
-              ),
-            ),
+            color: theme.colorScheme.surface,
           ),
           child: SafeArea(
             bottom: false,
@@ -110,18 +104,13 @@ class _ShellPageState extends State<ShellPage> {
         ),
       ),
       body: ColoredBox(
-        color: Colors.white,
+        color: theme.colorScheme.surface,
         child: SafeArea(top: false, child: _buildBody()),
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: NavigationBar(
-          backgroundColor: Colors.white,
-          selectedIndex: _currentIndex,
-          destinations: destinations,
-          height: 68,
-          onDestinationSelected: _onDestinationSelected,
-        ),
+      bottomNavigationBar: BlurredNavBar(
+        selectedIndex: _currentIndex,
+        destinations: destinations,
+        onDestinationSelected: _onDestinationSelected,
       ),
     );
   }

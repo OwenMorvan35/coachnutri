@@ -282,7 +282,6 @@ class _WeightPageState extends State<WeightPage> {
               DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
                 child: DropdownButton<int>(
                   isExpanded: true,
@@ -323,7 +322,6 @@ class _WeightPageState extends State<WeightPage> {
               DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
                 ),
                 child: DropdownButton<int?>(
                   isExpanded: true,

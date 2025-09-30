@@ -26,10 +26,12 @@ class RecipeDetailPage extends StatelessWidget {
               child: recipe.image != null && recipe.image!.isNotEmpty
                   ? Image.network(recipe.image!, fit: BoxFit.cover)
                   : Container(
-                      color: theme.colorScheme.surfaceVariant,
+                      color: theme.colorScheme.surface,
                       alignment: Alignment.center,
-                      child:
-                          Icon(Icons.image_rounded, color: theme.colorScheme.outline),
+                      child: Icon(
+                        Icons.image_rounded,
+                        color: theme.colorScheme.onSurface.withOpacity(0.3),
+                      ),
                     ),
             ),
           ),

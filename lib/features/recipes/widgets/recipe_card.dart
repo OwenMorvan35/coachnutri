@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/recipe.dart';
+import '../../../ui/widgets/liquid_chip.dart';
 
 class RecipeCard extends StatelessWidget {
   const RecipeCard({super.key, required this.recipe, this.onTap});
@@ -11,15 +12,20 @@ class RecipeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final outline = theme.colorScheme.outlineVariant;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Ink(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: Colors.white,
-          border: Border.all(color: outline),
+          color: theme.colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,9 +41,12 @@ class RecipeCard extends StatelessWidget {
                     child: recipe.image != null && recipe.image!.isNotEmpty
                         ? Image.network(recipe.image!, fit: BoxFit.cover)
                         : Container(
-                            color: theme.colorScheme.surfaceVariant,
+                            color: theme.colorScheme.surface,
                             alignment: Alignment.center,
-                            child: Icon(Icons.image_rounded, color: theme.colorScheme.outline),
+                            child: Icon(
+                              Icons.image_rounded,
+                              color: theme.colorScheme.onSurface.withOpacity(0.3),
+                            ),
                           ),
                   ),
                   // Overlay pill for quick info (time / servings)
@@ -52,7 +61,7 @@ class RecipeCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Divider(height: 1),
+            // Remove dividing line for a cleaner, unified look
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Column(
@@ -69,7 +78,10 @@ class RecipeCard extends StatelessWidget {
                     Wrap(
                       spacing: 6,
                       runSpacing: -8,
-                      children: recipe.tags.take(2).map((t) => _TagChip(text: t)).toList(),
+                      children: recipe.tags
+                          .take(2)
+                          .map<Widget>((t) => LiquidChip(label: t))
+                          .toList(growable: false),
                     ),
                 ],
               ),
@@ -117,27 +129,4 @@ class _InfoPill extends StatelessWidget {
   }
 }
 
-class _TagChip extends StatelessWidget {
-  const _TagChip({required this.text});
-  final String text;
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.22)),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: theme.colorScheme.primary,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
+// Tag chip remodeled to use glass tokens via LiquidChip (see ui/widgets)

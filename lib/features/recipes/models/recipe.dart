@@ -54,18 +54,20 @@ class Recipe {
     final List<dynamic> ingredientsRaw = (json['ingredients'] as List?) ?? const [];
     final List<dynamic> stepsRaw = (json['steps'] as List?) ?? const [];
     final List<dynamic> tagsRaw = (json['tags'] as List?) ?? const [];
-    String? _image(String? raw) {
+    const fallbackImage = 'https://picsum.photos/500/300';
+    String _image(String? raw) {
       final img = raw?.trim();
-      if (img == null || img.isEmpty) return null;
+      if (img == null || img.isEmpty) return fallbackImage;
       if (img == 'https://example.com/soupe_oignon.jpg') {
-        return 'https://picsum.photos/200/300';
+        return fallbackImage;
       }
       return img;
     }
+    final imageRaw = (json['image'] ?? json['imageUrl']) as String?;
     return Recipe(
       id: (json['id'] as String? ?? '').trim(),
       title: (json['title'] as String? ?? '').trim(),
-      image: _image(json['image'] as String?),
+      image: _image(imageRaw),
       readyInMin: _tryParseInt(json['readyInMin']),
       servings: _tryParseInt(json['servings']),
       tags: tagsRaw.map((e) => e.toString()).toList(growable: false),

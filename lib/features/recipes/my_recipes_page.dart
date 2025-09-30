@@ -46,7 +46,7 @@ class _MyRecipesPageState extends State<MyRecipesPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Mes recettes')),
       body: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null

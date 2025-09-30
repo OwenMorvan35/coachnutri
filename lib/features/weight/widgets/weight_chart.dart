@@ -12,21 +12,37 @@ class WeightChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: SizedBox(
-        height: 240,
-        width: double.infinity,
-        child: points.isEmpty
-            ? const Center(
-                child: Text('Ajoute des mesures pour visualiser le graphique.'),
-              )
-            : CustomPaint(
-                painter: _WeightChartPainter(points: points),
-                child: const SizedBox.expand(),
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+    return SizedBox(
+      height: 240,
+      width: double.infinity,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Subtle gradient backdrop
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0x114DA3FF), Color(0x118AD3FF)],
+                ),
               ),
+            ),
+            CustomPaint(
+              painter: _WeightChartPainter(
+                points: points,
+                axisColor: onSurface.withOpacity(0.45),
+                gridColor: onSurface.withOpacity(0.12),
+                textColor: onSurface.withOpacity(0.85),
+              ),
+              child: const SizedBox.expand(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -41,9 +57,17 @@ class WeightPoint {
 }
 
 class _WeightChartPainter extends CustomPainter {
-  _WeightChartPainter({required this.points});
+  _WeightChartPainter({
+    required this.points,
+    required this.axisColor,
+    required this.gridColor,
+    required this.textColor,
+  });
 
   final List<WeightPoint> points;
+  final Color axisColor;
+  final Color gridColor;
+  final Color textColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -68,10 +92,10 @@ class _WeightChartPainter extends CustomPainter {
     final totalDays = max(1, maxDate.difference(minDate).inDays);
 
     final axisPaint = Paint()
-      ..color = Colors.grey.shade600
+      ..color = axisColor
       ..strokeWidth = 1.2;
     final gridPaint = Paint()
-      ..color = Colors.grey.shade300
+      ..color = gridColor
       ..strokeWidth = 1.0;
     final linePaint = Paint()
       ..color = Colors.green.shade700
@@ -124,7 +148,7 @@ class _WeightChartPainter extends CustomPainter {
 
       textPainter.text = TextSpan(
         text: weightValue.toStringAsFixed(1),
-        style: const TextStyle(fontSize: 11, color: Colors.black87),
+        style: TextStyle(fontSize: 11, color: textColor),
       );
       textPainter.layout();
       textPainter.paint(
@@ -177,7 +201,7 @@ class _WeightChartPainter extends CustomPainter {
         final label = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}';
         textPainter.text = TextSpan(
           text: label,
-          style: const TextStyle(fontSize: 11, color: Colors.black87),
+          style: TextStyle(fontSize: 11, color: textColor),
         );
         textPainter.layout();
         textPainter.paint(

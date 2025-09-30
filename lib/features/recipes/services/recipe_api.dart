@@ -48,11 +48,12 @@ class RecipeApi {
     final List<dynamic> tags = (json['tags'] as List?) ?? const [];
     final List<dynamic> steps = (json['steps'] as List?) ?? const [];
     final List<dynamic> ings = (json['ingredientsJson'] as List?) ?? const [];
-    String? _image(String? raw) {
+    const fallbackImage = 'https://picsum.photos/500/300';
+    String _image(String? raw) {
       final img = raw?.trim();
-      if (img == null || img.isEmpty) return null;
+      if (img == null || img.isEmpty) return fallbackImage;
       if (img == 'https://example.com/soupe_oignon.jpg') {
-        return 'https://picsum.photos/200/300';
+        return fallbackImage;
       }
       return img;
     }

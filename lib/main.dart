@@ -4,15 +4,23 @@ import 'package:flutter/material.dart';
 
 import 'core/logger.dart';
 import 'core/session.dart';
-import 'core/theme.dart';
+import 'core/session_storage.dart';
+import 'theme/app_theme.dart';
 import 'features/auth/auth_page.dart';
 import 'features/shell/shell_page.dart';
 
 void main() {
   runZonedGuarded(
-    () {
+    () async {
       WidgetsFlutterBinding.ensureInitialized();
       final sessionController = SessionController();
+      // Try to restore cached session before rendering the app
+      try {
+        final restored = await SessionStorage().load();
+        if (restored != null) {
+          sessionController.setSession(restored);
+        }
+      } catch (_) {}
       FlutterError.onError = (details) {
         Logger.e(
           'FLUTTER',
@@ -41,7 +49,7 @@ class CoachNutriApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'CoachNutri',
-        theme: CoachNutriTheme.light(),
+        theme: AppTheme.light(),
         home: SessionGate(controller: sessionController),
       ),
     );

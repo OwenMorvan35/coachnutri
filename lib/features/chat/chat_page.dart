@@ -6,6 +6,9 @@ import '../../core/logger.dart';
 import '../../core/session.dart';
 import 'models/message.dart';
 import 'widgets/message_bubble.dart';
+import '../../ui/widgets/glass_container.dart';
+import '../../theme/app_theme.dart';
+import '../../ui/widgets/water_drop_button.dart';
 import 'services/coach_api.dart';
 import 'services/chat_hooks.dart';
 import '../auth/models/auth_session.dart';
@@ -64,6 +67,8 @@ class _ChatPageState extends State<ChatPage> {
           );
         }
       });
+      // Ensure we land on the latest messages after initial load
+      _scrollToBottom();
     } on CoachApiException catch (e) {
       Logger.w('CHAT_HISTORY', 'History unavailable: ${e.message}');
       if (!mounted) return;
@@ -77,6 +82,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
         );
       });
+      _scrollToBottom();
     } catch (e, st) {
       Logger.e('CHAT_HISTORY', 'Failed to load history', e, st);
       if (!mounted) return;
@@ -90,26 +96,33 @@ class _ChatPageState extends State<ChatPage> {
           ),
         );
       });
+      _scrollToBottom();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).extension<GlassTokens>()?.neutralSurface,
       child: Column(
         children: [
           Expanded(
-            child: ListView.separated(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              itemCount: _messages.length,
-              physics: const BouncingScrollPhysics(),
-              separatorBuilder: (context, _) => const SizedBox(height: 4),
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return MessageBubble(message: message);
-              },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: GlassContainer(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                child: ListView.separated(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(4, 6, 4, 32),
+                  itemCount: _messages.length,
+                  physics: const BouncingScrollPhysics(),
+                  separatorBuilder: (context, _) => const SizedBox(height: 4),
+                  itemBuilder: (context, index) {
+                    final message = _messages[index];
+                    return MessageBubble(message: message);
+                  },
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -123,12 +136,9 @@ class _ChatPageState extends State<ChatPage> {
     final viewInsets = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets > 0 ? 8 : 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: GlassContainer(
+        radius: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -137,16 +147,22 @@ class _ChatPageState extends State<ChatPage> {
                 controller: _inputController,
                 enabled: !_isSending,
                 textCapitalization: TextCapitalization.sentences,
+                textAlignVertical: TextAlignVertical.center,
+                style: Theme.of(context).textTheme.bodyLarge,
                 minLines: 1,
                 maxLines: 4,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Dis-moi comment je peux t’aider…',
+                  hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.45),
+                      ),
                   border: InputBorder.none,
                   filled: false,
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 6,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
                   ),
+                  isDense: false,
                 ),
               ),
             ),
@@ -159,10 +175,10 @@ class _ChatPageState extends State<ChatPage> {
                       width: 26,
                       child: CircularProgressIndicator(strokeWidth: 2.4),
                     )
-                  : IconButton(
+                  : WaterDropButton(
                       key: const ValueKey('send'),
                       onPressed: _handleSend,
-                      icon: const Icon(Icons.send_rounded),
+                      child: const Icon(Icons.send_rounded, size: 18),
                     ),
             ),
           ],
@@ -335,18 +351,27 @@ class _ChatPageState extends State<ChatPage> {
         .toList(growable: false);
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({int attempt = 0}) {
+    if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       if (!_scrollController.hasClients) {
+        if (attempt < 5) {
+          Future.delayed(const Duration(milliseconds: 40), () => _scrollToBottom(attempt: attempt + 1));
+        }
         return;
       }
-      final target = _scrollController.position.maxScrollExtent;
-      Logger.i('CHAT_SCROLL', 'Auto scroll to position $target');
+      final position = _scrollController.position;
+      final target = position.maxScrollExtent;
+      if ((position.pixels - target).abs() < 4) {
+        return;
+      }
+      Logger.i('CHAT_SCROLL', 'Auto scroll attempt $attempt to $target');
       _scrollController
           .animateTo(
             target,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
           )
           .catchError((Object error, StackTrace stackTrace) {
             Logger.e('CHAT_SCROLL', 'Scroll failed', error, stackTrace);

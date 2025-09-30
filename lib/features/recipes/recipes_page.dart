@@ -9,10 +9,9 @@ class RecipesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Column(
-        children: [
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      children: [
           _ActionCard(
             color: const Color(0xFFE7E4FF),
             icon: Icons.menu_book_rounded,
@@ -32,9 +31,9 @@ class RecipesPage extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const ShoppingListPage()),
             ),
           ),
+          // Grille visible sur la page dédiée "Mes recettes"
         ],
-      ),
-    );
+      );
   }
 }
 
@@ -100,4 +99,3 @@ class _ActionCard extends StatelessWidget {
     );
   }
 }
-

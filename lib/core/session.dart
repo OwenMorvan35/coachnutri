@@ -1,8 +1,12 @@
 import 'package:flutter/widgets.dart';
 
 import '../features/auth/models/auth_session.dart';
+import 'session_storage.dart';
 
 class SessionController extends ChangeNotifier {
+  SessionController({SessionStorage? storage}) : _storage = storage ?? SessionStorage();
+
+  final SessionStorage _storage;
   AuthSession? _session;
 
   AuthSession? get session => _session;
@@ -10,11 +14,13 @@ class SessionController extends ChangeNotifier {
 
   void setSession(AuthSession session) {
     _session = session;
+    _storage.save(session);
     notifyListeners();
   }
 
   void clearSession() {
     _session = null;
+    _storage.clear();
     notifyListeners();
   }
 }
