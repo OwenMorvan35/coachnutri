@@ -239,27 +239,25 @@ class _WeightPageState extends State<WeightPage> {
           const SizedBox(height: 16),
           _buildRangeSelector(theme),
           const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.wifi_off_rounded, size: 48),
-                  const SizedBox(height: 12),
-                  Text(
-                    _error!,
-                    style: theme.textTheme.titleMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: () => _loadRange(_selectedRange, force: true),
-                    child: const Text('Réessayer'),
-                  ),
-                ],
-              ),
+          _panel(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.wifi_off_rounded, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  _error!,
+                  style: theme.textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () => _loadRange(_selectedRange, force: true),
+                  child: const Text('Réessayer'),
+                ),
+              ],
             ),
+            padding: const EdgeInsets.all(24),
           ),
         ],
       );
@@ -303,13 +301,6 @@ class _WeightPageState extends State<WeightPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x332563EB),
-            offset: Offset(0, 18),
-            blurRadius: 32,
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -347,95 +338,94 @@ class _WeightPageState extends State<WeightPage> {
   }
 
   Widget _buildRangeSelector(ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Période', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            SegmentedButton<WeightRange>(
-              segments: [
-                for (final range in WeightRange.values)
-                  ButtonSegment<WeightRange>(
-                    value: range,
-                    label: Text(range.label),
-                  ),
-              ],
-              selected: <WeightRange>{_selectedRange},
-              onSelectionChanged: (selection) => _onRangeChanged(selection.first),
-            ),
-          ],
-        ),
+    final ranges = const [WeightRange.week, WeightRange.month, WeightRange.year];
+    if (!ranges.contains(_selectedRange)) {
+      _selectedRange = WeightRange.week;
+    }
+
+    return _panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Période', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 12),
+          SegmentedButton<WeightRange>(
+            segments: [
+              for (final range in ranges)
+                ButtonSegment<WeightRange>(
+                  value: range,
+                  label: Text(range.label),
+                ),
+            ],
+            selected: <WeightRange>{_selectedRange},
+            onSelectionChanged: (selection) => _onRangeChanged(selection.first),
+          ),
+        ],
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 
   Widget _buildChartCard(ThemeData theme, List<WeightEntry> entries) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Progression', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 240,
-              child: entries.isEmpty
-                  ? const Center(child: Text('Aucune donnée pour cette période.'))
-                  : WeightChart(
-                      entries: entries,
-                      range: _selectedRange,
-                      highlighted: _highlighted,
-                      onEntryFocus: _handleHighlight,
-                    ),
-            ),
-            if (_highlighted != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.bolt_rounded, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '${_formatFullDate(_highlighted!.date)} • ${_formatWeight(_highlighted!.weightKg)} kg',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
-                ),
+    return _panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Progression', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 240,
+            child: entries.isEmpty
+                ? const Center(child: Text('Aucune donnée pour cette période.'))
+                : WeightChart(
+                    entries: entries,
+                    range: _selectedRange,
+                    highlighted: _highlighted,
+                    onEntryFocus: _handleHighlight,
+                  ),
+          ),
+          if (_highlighted != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: Colors.black.withOpacity(0.05),
               ),
-            ],
+              child: Row(
+                children: [
+                  const Icon(Icons.bolt_rounded, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${_formatFullDate(_highlighted!.date)} • ${_formatWeight(_highlighted!.weightKg)} kg',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
-        ),
+        ],
       ),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
     );
   }
 
   Widget _buildStatsRow(ThemeData theme, WeightStats stats) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        child: Row(
-          children: [
-            _buildStatTile(theme, 'Dernier', stats.latest),
-            _buildDivider(),
-            _buildStatTile(theme, 'Minimum', stats.min),
-            _buildDivider(),
-            _buildStatTile(theme, 'Maximum', stats.max),
-            _buildDivider(),
-            _buildStatTile(theme, 'Moyenne', stats.average),
-          ],
-        ),
+    return _panel(
+      child: Row(
+        children: [
+          _buildStatTile(theme, 'Dernier', stats.latest),
+          _buildDivider(),
+          _buildStatTile(theme, 'Minimum', stats.min),
+          _buildDivider(),
+          _buildStatTile(theme, 'Maximum', stats.max),
+          _buildDivider(),
+          _buildStatTile(theme, 'Moyenne', stats.average),
+        ],
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
     );
   }
 
@@ -462,31 +452,29 @@ class _WeightPageState extends State<WeightPage> {
 
   Widget _buildHistory(ThemeData theme, List<WeightEntry> entries) {
     if (entries.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.insert_chart_outlined, size: 48, color: theme.colorScheme.primary),
-              const SizedBox(height: 12),
-              Text(
-                'Aucune mesure pour cette période',
-                style: theme.textTheme.titleMedium,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Ajoute un poids ou demande au coach de le faire pour toi.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
+      return _panel(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.insert_chart_outlined, size: 48, color: theme.colorScheme.primary),
+            const SizedBox(height: 12),
+            Text(
+              'Aucune mesure pour cette période',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Ajoute un poids ou demande au coach de le faire pour toi.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
         ),
+        padding: const EdgeInsets.all(24),
       );
     }
 
-    return Card(
+    return _panel(
       child: ListView.separated(
         physics: const NeverScrollableScrollPhysics(),
         shrinkWrap: true,
@@ -509,9 +497,9 @@ class _WeightPageState extends State<WeightPage> {
 
   Widget _buildSourceAvatar(ThemeData theme, WeightEntry entry) {
     final color = switch (entry.source) {
-      WeightEntrySource.ai => theme.colorScheme.primary,
-      WeightEntrySource.import => theme.colorScheme.tertiary,
-      _ => theme.colorScheme.secondary,
+      WeightEntrySource.ai => const Color(0xFF55C0A6),
+      WeightEntrySource.import => const Color(0xFF6CC3F6),
+      _ => const Color(0xFFFF6F6F),
     };
     final icon = switch (entry.source) {
       WeightEntrySource.ai => Icons.smart_toy_outlined,
@@ -535,5 +523,17 @@ class _WeightPageState extends State<WeightPage> {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day/$month/$year à $hour:$minute';
+  }
+
+  Widget _panel({required Widget child, EdgeInsets padding = const EdgeInsets.all(16)}) {
+    return Container(
+      width: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(26),
+      ),
+      child: child,
+    );
   }
 }

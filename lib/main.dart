@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/logger.dart';
 import 'core/session.dart';
 import 'core/session_storage.dart';
 import 'theme/app_theme.dart';
+import 'ui/widgets/pattern_background.dart';
 import 'features/auth/auth_page.dart';
 import 'features/shell/shell_page.dart';
 
@@ -50,6 +52,18 @@ class CoachNutriApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'CoachNutri',
         theme: AppTheme.light(),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('fr', 'FR'),
+          Locale('en', 'US'),
+        ],
+        builder: (context, child) => PatternBackground(
+          child: child ?? const SizedBox.shrink(),
+        ),
         home: SessionGate(controller: sessionController),
       ),
     );

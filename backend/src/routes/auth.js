@@ -101,6 +101,12 @@ authRouter.post('/register', async (req, res, next) => {
       },
     });
 
+    await prisma.healthProfile.upsert({
+      where: { userId: user.id },
+      update: {},
+      create: { userId: user.id },
+    });
+
     logInfo('auth', 'User registered', { userId: user.id, email: user.email });
 
     const token = buildToken(user.id);

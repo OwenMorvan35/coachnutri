@@ -21,6 +21,7 @@ model User {
   shoppingLists ShoppingList[]
   chatMessages  ChatMessage[]
   weightEntries WeightEntry[]
+  healthProfile HealthProfile?
 }
 
 model Recipe {
@@ -90,6 +91,29 @@ enum WeightEntrySource {
   IMPORT
 }
 
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+  UNSPECIFIED
+}
+
+enum GoalType {
+  LOSE
+  MAINTAIN
+  GAIN
+  UNSPECIFIED
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHT
+  MODERATE
+  ACTIVE
+  VERY_ACTIVE
+  UNSPECIFIED
+}
+
 model WeightEntry {
   id        String            @id @default(uuid())
   user      User              @relation(fields: [userId], references: [id])
@@ -102,4 +126,24 @@ model WeightEntry {
   updatedAt DateTime          @updatedAt
 
   @@index([userId, date])
+}
+
+model HealthProfile {
+  id                 String         @id @default(uuid())
+  user               User           @relation(fields: [userId], references: [id])
+  userId             String         @unique
+  gender             Gender         @default(UNSPECIFIED)
+  birthDate          DateTime?
+  heightCm           Float?
+  startingWeightKg   Float?
+  goal               GoalType       @default(UNSPECIFIED)
+  activityLevel      ActivityLevel  @default(UNSPECIFIED)
+  allergies          String[]       @default([])
+  dietaryPreferences String[]       @default([])
+  constraints        String[]       @default([])
+  budgetConstraint   String?
+  timeConstraint     String?
+  medicalConditions  String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
 }

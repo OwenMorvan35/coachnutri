@@ -113,10 +113,9 @@ class AppTheme {
     final colorScheme = ColorScheme.light(
       primary: tokens.accentPrimary,
       secondary: tokens.accentSecondary,
-      surface: tokens.neutralSurface,
+      surface: Colors.transparent,
       onSurface: tokens.textPrimary,
       onPrimary: Colors.white,
-      // Remove grey outlines across the app
       outline: Colors.transparent,
       outlineVariant: Colors.transparent,
     );
@@ -142,7 +141,7 @@ class AppTheme {
       useMaterial3: true,
       fontFamily: fontStack,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: tokens.neutralSurface,
+      scaffoldBackgroundColor: Colors.transparent,
       textTheme: textTheme,
       inputDecorationTheme: InputDecorationTheme(
         isDense: true,

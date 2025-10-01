@@ -1,3 +1,4 @@
+import 'package:coachnutri/core/widgets/app_date_picker.dart';
 import 'package:flutter/material.dart';
 
 class AddWeightSheetResult {
@@ -127,7 +128,7 @@ class _AddWeightSheetState extends State<AddWeightSheet> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final result = await showDatePicker(
+    final result = await showAppDatePicker(
       context: context,
       firstDate: DateTime(now.year - 3, 1, 1),
       lastDate: now,

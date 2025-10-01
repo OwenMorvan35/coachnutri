@@ -71,6 +71,28 @@ const passwordSchema = z.object({
     .max(72, 'Nouveau mot de passe trop long'),
 });
 
+const genderValues = ['FEMALE', 'MALE', 'OTHER', 'UNSPECIFIED'];
+const goalValues = ['LOSE', 'MAINTAIN', 'GAIN', 'UNSPECIFIED'];
+const activityValues = ['SEDENTARY', 'LIGHT', 'MODERATE', 'ACTIVE', 'VERY_ACTIVE', 'UNSPECIFIED'];
+
+const nutritionSchema = z.object({
+  gender: z.enum(genderValues).optional(),
+  birthDate: z
+    .string()
+    .datetime()
+    .optional(),
+  heightCm: z.number().min(80).max(260).optional(),
+  startingWeightKg: z.number().min(20).max(400).optional(),
+  goal: z.enum(goalValues).optional(),
+  activityLevel: z.enum(activityValues).optional(),
+  allergies: z.array(z.string().trim()).optional(),
+  dietaryPreferences: z.array(z.string().trim()).optional(),
+  constraints: z.array(z.string().trim()).optional(),
+  budgetConstraint: z.string().trim().max(200).optional(),
+  timeConstraint: z.string().trim().max(200).optional(),
+  medicalConditions: z.string().trim().max(2000).optional(),
+});
+
 const serializeUser = (user) => ({
   id: user.id,
   email: user.email,
@@ -80,6 +102,48 @@ const serializeUser = (user) => ({
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
+
+const serializeHealthProfile = (profile) => ({
+  id: profile.id,
+  userId: profile.userId,
+  gender: profile.gender,
+  birthDate: profile.birthDate,
+  heightCm: profile.heightCm,
+  startingWeightKg: profile.startingWeightKg,
+  goal: profile.goal,
+  activityLevel: profile.activityLevel,
+  allergies: profile.allergies ?? [],
+  dietaryPreferences: profile.dietaryPreferences ?? [],
+  constraints: profile.constraints ?? [],
+  budgetConstraint: profile.budgetConstraint,
+  timeConstraint: profile.timeConstraint,
+  medicalConditions: profile.medicalConditions,
+  createdAt: profile.createdAt,
+  updatedAt: profile.updatedAt,
+});
+
+const ensureHealthProfile = async (userId) => {
+  return prisma.healthProfile.upsert({
+    where: { userId },
+    update: {},
+    create: { userId },
+  });
+};
+
+const normalizeStringArray = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : String(item).trim()))
+      .filter((item) => item.length > 0);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+  return [];
+};
 
 usersRouter.get('/me', async (req, res, next) => {
   try {
@@ -239,6 +303,88 @@ usersRouter.post('/me/avatar', upload.single('avatar'), async (req, res, next) =
     res.json({ user: serializeUser(updated) });
   } catch (error) {
     logError('usersRouter', 'Failed to upload avatar', error);
+    next(error);
+  }
+});
+
+usersRouter.get('/me/nutrition', async (req, res, next) => {
+  try {
+    const profile = await ensureHealthProfile(req.user.id);
+    res.json({ profile: serializeHealthProfile(profile) });
+  } catch (error) {
+    logError('usersRouter', 'Failed to fetch nutrition profile', error);
+    next(error);
+  }
+});
+
+usersRouter.put('/me/nutrition', async (req, res, next) => {
+  try {
+    const raw = req.body ?? {};
+    const parsed = nutritionSchema.safeParse({
+      gender: raw.gender,
+      birthDate: raw.birthDate,
+      heightCm: raw.heightCm != null ? Number(raw.heightCm) : undefined,
+      startingWeightKg: raw.startingWeightKg != null ? Number(raw.startingWeightKg) : undefined,
+      goal: raw.goal,
+      activityLevel: raw.activityLevel,
+      allergies: normalizeStringArray(raw.allergies),
+      dietaryPreferences: normalizeStringArray(raw.dietaryPreferences),
+      constraints: normalizeStringArray(raw.constraints),
+      budgetConstraint: typeof raw.budgetConstraint === 'string' ? raw.budgetConstraint.trim() : undefined,
+      timeConstraint: typeof raw.timeConstraint === 'string' ? raw.timeConstraint.trim() : undefined,
+      medicalConditions: typeof raw.medicalConditions === 'string' ? raw.medicalConditions.trim() : undefined,
+    });
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: {
+          code: 'invalid_request',
+          message: parsed.error.errors[0]?.message ?? 'Requête invalide',
+        },
+      });
+    }
+
+    const data = parsed.data;
+    const birthDate = data.birthDate ? new Date(data.birthDate) : null;
+
+    const profile = await prisma.healthProfile.upsert({
+      where: { userId: req.user.id },
+      update: {
+        gender: data.gender ?? 'UNSPECIFIED',
+        birthDate,
+        heightCm: data.heightCm ?? null,
+        startingWeightKg: data.startingWeightKg ?? null,
+        goal: data.goal ?? 'UNSPECIFIED',
+        activityLevel: data.activityLevel ?? 'UNSPECIFIED',
+        allergies: data.allergies ?? [],
+        dietaryPreferences: data.dietaryPreferences ?? [],
+        constraints: data.constraints ?? [],
+        budgetConstraint: data.budgetConstraint ?? null,
+        timeConstraint: data.timeConstraint ?? null,
+        medicalConditions: data.medicalConditions ?? null,
+      },
+      create: {
+        userId: req.user.id,
+        gender: data.gender ?? 'UNSPECIFIED',
+        birthDate,
+        heightCm: data.heightCm ?? null,
+        startingWeightKg: data.startingWeightKg ?? null,
+        goal: data.goal ?? 'UNSPECIFIED',
+        activityLevel: data.activityLevel ?? 'UNSPECIFIED',
+        allergies: data.allergies ?? [],
+        dietaryPreferences: data.dietaryPreferences ?? [],
+        constraints: data.constraints ?? [],
+        budgetConstraint: data.budgetConstraint ?? null,
+        timeConstraint: data.timeConstraint ?? null,
+        medicalConditions: data.medicalConditions ?? null,
+      },
+    });
+
+    logInfo('usersRouter', 'Nutrition profile updated', { userId: req.user.id });
+
+    res.json({ profile: serializeHealthProfile(profile) });
+  } catch (error) {
+    logError('usersRouter', 'Failed to update nutrition profile', error);
     next(error);
   }
 });

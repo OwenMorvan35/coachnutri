@@ -107,33 +107,27 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Theme.of(context).extension<GlassTokens>()?.neutralSurface,
-      child: Column(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: GlassContainer(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                child: ListView.separated(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(4, 6, 4, 32),
-                  itemCount: _messages.length,
-                  physics: const BouncingScrollPhysics(),
-                  separatorBuilder: (context, _) => const SizedBox(height: 4),
-                  itemBuilder: (context, index) {
-                    final message = _messages[index];
-                    return MessageBubble(message: message);
-                  },
-                ),
-              ),
+    return Column(
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: ListView.separated(
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(4, 6, 4, 32),
+              itemCount: _messages.length,
+              physics: const BouncingScrollPhysics(),
+              separatorBuilder: (context, _) => const SizedBox(height: 4),
+              itemBuilder: (context, index) {
+                final message = _messages[index];
+                return MessageBubble(message: message);
+              },
             ),
           ),
-          const SizedBox(height: 12),
-          _buildComposer(context),
-        ],
-      ),
+        ),
+        const SizedBox(height: 12),
+        _buildComposer(context),
+      ],
     );
   }
 
@@ -141,8 +135,11 @@ class _ChatPageState extends State<ChatPage> {
     final viewInsets = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets > 0 ? 8 : 0),
-      child: GlassContainer(
-        radius: 24,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.92),
+          borderRadius: BorderRadius.circular(24),
+        ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,

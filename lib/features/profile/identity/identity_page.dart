@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/session.dart';
-import '../../auth/models/auth_session.dart';
+import '../nutrition/nutrition_page.dart';
 import 'identity_api.dart';
 import 'identity_profile.dart';
 
@@ -106,9 +106,84 @@ class _IdentityPageState extends State<IdentityPage> {
                 children: [
                   _buildAvatarSection(theme),
                   const SizedBox(height: 24),
-                  _buildIdentityForm(theme),
+                  _sectionCard(
+                    theme,
+                    title: 'Informations',
+                    children: [
+                      TextField(
+                        controller: _displayNameCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: _inputDecoration('Pseudo', hint: 'Ex: Alex Coach'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _nameCtrl,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: _inputDecoration('Nom complet (optionnel)'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        initialValue: _profile?.email ?? '',
+                        readOnly: true,
+                        decoration: _inputDecoration('Email'),
+                      ),
+                      const SizedBox(height: 20),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.favorite_rounded),
+                        title: const Text('Santé & nutrition'),
+                        subtitle:
+                            const Text('Objectifs, allergies, préférences'),
+                        trailing:
+                            const Icon(Icons.chevron_right_rounded),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const NutritionPage(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 32),
-                  _buildSecuritySection(theme),
+                  _sectionCard(
+                    theme,
+                    title: 'Sécurité',
+                    children: [
+                      TextField(
+                        controller: _currentPasswordCtrl,
+                        obscureText: true,
+                        decoration: _inputDecoration('Mot de passe actuel'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _newPasswordCtrl,
+                        obscureText: true,
+                        decoration: _inputDecoration('Nouveau mot de passe'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _confirmPasswordCtrl,
+                        obscureText: true,
+                        decoration: _inputDecoration('Confirmer le nouveau mot de passe'),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: _changingPassword ? null : _changePassword,
+                          child: _changingPassword
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                                )
+                              : const Text('Modifier mon mot de passe'),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 32),
                   _buildLogoutButton(theme),
                 ],
@@ -176,36 +251,41 @@ class _IdentityPageState extends State<IdentityPage> {
   }
 
   Widget _buildIdentityForm(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return _sectionCard(
+      theme,
+      title: 'Informations',
       children: [
-        Text('Informations', style: theme.textTheme.titleLarge),
-        const SizedBox(height: 16),
         TextField(
           controller: _displayNameCtrl,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'Pseudo',
-            hintText: 'Ex: Alex Coach',
-          ),
+          decoration: _inputDecoration('Pseudo', hint: 'Ex: Alex Coach'),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _nameCtrl,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'Nom complet (optionnel)',
-          ),
+          decoration: _inputDecoration('Nom complet (optionnel)'),
         ),
         const SizedBox(height: 12),
-        InputDecorator(
-          decoration: const InputDecoration(
-            labelText: 'Email',
-            border: OutlineInputBorder(),
-          ),
-          child: Text(_profile?.email ?? ''),
+        TextFormField(
+          initialValue: _profile?.email ?? '',
+          readOnly: true,
+          decoration: _inputDecoration('Email'),
         ),
         const SizedBox(height: 20),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.favorite_rounded),
+          title: const Text('Santé & nutrition'),
+          subtitle: const Text('Objectifs, allergies, préférences'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NutritionPage()),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: FilledButton(
@@ -224,33 +304,26 @@ class _IdentityPageState extends State<IdentityPage> {
   }
 
   Widget _buildSecuritySection(ThemeData theme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return _sectionCard(
+      theme,
+      title: 'Sécurité',
       children: [
-        Text('Sécurité', style: theme.textTheme.titleLarge),
-        const SizedBox(height: 16),
         TextField(
           controller: _currentPasswordCtrl,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Mot de passe actuel',
-          ),
+          decoration: _inputDecoration('Mot de passe actuel'),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _newPasswordCtrl,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Nouveau mot de passe',
-          ),
+          decoration: _inputDecoration('Nouveau mot de passe'),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _confirmPasswordCtrl,
           obscureText: true,
-          decoration: const InputDecoration(
-            labelText: 'Confirmer le nouveau mot de passe',
-          ),
+          decoration: _inputDecoration('Confirmer le nouveau mot de passe'),
         ),
         const SizedBox(height: 16),
         SizedBox(
@@ -267,6 +340,45 @@ class _IdentityPageState extends State<IdentityPage> {
           ),
         ),
       ],
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, {String? hint}) {
+    final theme = Theme.of(context);
+    const baseBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(12)),
+      borderSide: BorderSide(color: Color(0xFF424242), width: 1.4),
+    );
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      border: baseBorder,
+      enabledBorder: baseBorder,
+      disabledBorder: baseBorder,
+      focusedBorder: baseBorder.copyWith(
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.8),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+    );
+  }
+
+  Widget _sectionCard(ThemeData theme,
+      {required String title, required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 18),
+          ...children,
+        ],
+      ),
     );
   }
 

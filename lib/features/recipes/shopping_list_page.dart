@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/session.dart';
-import '../../ui/widgets/glass_card.dart';
 import 'models/shopping_item.dart';
 import 'services/shopping_api.dart';
 import 'services/shopping_list_repository.dart';
@@ -56,82 +55,135 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final toBuy = _collectItems(inCart: false);
+    final inCartItems = _collectItems(inCart: true);
     return Scaffold(
       appBar: AppBar(title: const Text('Liste de courses')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      body: Column(
         children: [
-          _quickAddField(theme),
-          const SizedBox(height: 16),
-          // Super section: À acheter (non cochés)
-          Text('À acheter', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          ..._buildCategorySections(theme, inCart: false),
-          const SizedBox(height: 20),
-          // Super section: Dans le panier (cochés)
-          Text('Dans le panier', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          ..._buildCategorySections(theme, inCart: true),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              children: [
+                Text('À acheter', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 12),
+                _buildGrid(context, toBuy, inCart: false),
+                const SizedBox(height: 28),
+                Text('Dans le panier', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 12),
+                _buildGrid(context, inCartItems, inCart: true),
+              ],
+            ),
+          ),
+          SafeArea(
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: _inputDecoration(theme, hint: 'Ajouter un ingrédient…'),
+                    onSubmitted: (_) => _addQuick(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  height: 52,
+                  width: 52,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      shape: const CircleBorder(),
+                    ),
+                    onPressed: _addQuick,
+                    child: const Icon(Icons.add_rounded, size: 28),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  List<Widget> _buildCategorySections(ThemeData theme, {required bool inCart}) {
-    final widgets = <Widget>[];
-    _groups.forEach((categoryKey, items) {
-      final filtered = items.where((e) => e.isChecked == inCart).toList();
-      if (filtered.isEmpty) return;
-      widgets.add(Padding(
-        padding: const EdgeInsets.only(top: 10, bottom: 6),
-        child: Text(_labelFor(categoryKey), style: theme.textTheme.titleSmall),
-      ));
-      widgets.add(
-        GlassCard(
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: filtered
-                .map((e) => _ItemCard(
-                      item: e,
-                      isInCart: inCart,
-                      onToggle: () => _toggleItem(e.nameKey),
-                      onRemove: () => _removeItem(e.nameKey),
-                    ))
-                .toList(),
-          ),
+  Widget _buildGrid(BuildContext context, List<ShoppingItem> items,
+      {required bool inCart}) {
+    final theme = Theme.of(context);
+    if (items.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withOpacity(0.4), width: 1.3),
         ),
-      );
-    });
-    if (widgets.isEmpty) {
-      widgets.add(
-        Text(
+        child: Text(
           inCart ? 'Aucun article dans le panier.' : 'Aucun article à acheter.',
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
-    return widgets;
+
+    final width = MediaQuery.of(context).size.width;
+    final shortestSide = MediaQuery.of(context).size.shortestSide;
+    final isPhone = shortestSide < 600;
+    int crossAxisCount;
+    if (isPhone) {
+      crossAxisCount = (width / 110).floor().clamp(3, 4);
+    } else {
+      crossAxisCount = (width / 160).floor().clamp(4, 6);
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+        childAspectRatio: 0.95,
+      ),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _ShoppingTile(
+          item: item,
+          isInCart: inCart,
+          onToggle: () => _toggleItem(item.nameKey),
+          onRemove: () => _removeItem(item.nameKey),
+        );
+      },
+    );
   }
 
-  Widget _quickAddField(ThemeData theme) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: _controller,
-            decoration: const InputDecoration(
-              hintText: 'Ajouter un article…',
-            ),
-            onSubmitted: (_) => _addQuick(),
-          ),
-        ),
-        const SizedBox(width: 8),
-        FilledButton(
-          onPressed: _addQuick,
-          child: const Text('Ajouter'),
-        ),
-      ],
+  List<ShoppingItem> _collectItems({required bool inCart}) {
+    final list = <ShoppingItem>[];
+    _groups.forEach((_, items) {
+      list.addAll(items.where((item) => item.isChecked == inCart));
+    });
+    list.sort(
+      (a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+    );
+    return list;
+  }
+
+  InputDecoration _inputDecoration(ThemeData theme, {required String hint}) {
+    final baseBorder = const OutlineInputBorder(
+      borderRadius: BorderRadius.all(Radius.circular(14)),
+      borderSide: BorderSide(color: Color(0xFF424242), width: 1.4),
+    );
+    return InputDecoration(
+      hintText: hint,
+      border: baseBorder,
+      enabledBorder: baseBorder,
+      focusedBorder: baseBorder.copyWith(
+        borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.8),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     );
   }
 
@@ -163,31 +215,10 @@ class _ShoppingListPageState extends State<ShoppingListPage> {
       ShoppingListRepository.instance.replaceAll(widget.listId, serverItems);
     }).catchError((_) {});
   }
-
-  String _labelFor(String key) {
-    switch (key) {
-      case 'boucherie':
-        return 'Boucherie';
-      case 'fruits_legumes':
-        return 'Fruits & Légumes';
-      case 'cremerie':
-        return 'Crèmerie';
-      case 'boulangerie':
-        return 'Boulangerie';
-      case 'surgele':
-        return 'Surgelés';
-      case 'boissons':
-        return 'Boissons';
-      case 'epicerie':
-        return 'Épicerie';
-      default:
-        return 'Autres';
-    }
-  }
 }
 
-class _ItemCard extends StatelessWidget {
-  const _ItemCard({
+class _ShoppingTile extends StatelessWidget {
+  const _ShoppingTile({
     required this.item,
     required this.isInCart,
     required this.onToggle,
@@ -202,61 +233,62 @@ class _ItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = isInCart ? theme.colorScheme.error : theme.colorScheme.primary;
-    final bg = color.withOpacity(0.08);
-    final border = color.withOpacity(0.22);
-    return GestureDetector(
-      onTap: onToggle,
-      child: Container(
-        constraints: const BoxConstraints(minWidth: 120),
-        padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(isInCart ? Icons.check_circle_rounded : Icons.add_circle_rounded, size: 18, color: color),
-            const SizedBox(width: 8),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 160),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    item.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                      decoration: isInCart ? TextDecoration.lineThrough : null,
-                    ),
+    final background = isInCart ? const Color(0xFF55C0A6) : const Color(0xFFFF6F6F);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onToggle,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: 6,
+                right: 6,
+                child: InkWell(
+                  onTap: () {
+                    onRemove();
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: const Icon(Icons.close_rounded, size: 18, color: Colors.white),
                   ),
-                  if (item.qty != null)
-                    Text(
-                      '${item.qty}${item.unit ?? ''}${item.note != null && item.note!.isNotEmpty ? ' · ${item.note}' : ''}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(color: color.withOpacity(0.9)),
-                    ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            InkWell(
-              onTap: onRemove,
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.all(4.0),
-                child: Icon(Icons.delete_outline_rounded, size: 18, color: color),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isInCart ? Icons.shopping_bag_rounded : Icons.shopping_bag_outlined,
+                        size: 22,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        item.displayName,
+                        textAlign: TextAlign.center,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          decoration: isInCart ? TextDecoration.lineThrough : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -83,6 +83,25 @@ curl -s -X POST http://localhost:5001/users/me/password \
 curl -s -X POST http://localhost:5001/users/me/avatar \
   -H "Authorization: Bearer <token>" \
   -F "avatar=@/chemin/vers/avatar.png"
+
+# Profil santé / nutrition
+curl -s http://localhost:5001/users/me/nutrition \
+  -H "Authorization: Bearer <token>" | jq
+
+curl -s -X PUT http://localhost:5001/users/me/nutrition \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "gender": "FEMALE",
+        "goal": "LOSE",
+        "activityLevel": "MODERATE",
+        "heightCm": 168,
+        "startingWeightKg": 72.5,
+        "allergies": ["arachides"],
+        "dietaryPreferences": ["vegan"],
+        "constraints": ["budget limité"],
+        "medicalConditions": "Hypothyroïdie"
+      }' | jq
 ```
 
 ## Notes
