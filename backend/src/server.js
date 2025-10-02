@@ -19,6 +19,7 @@ import { shoppingListsRouter } from './routes/shoppingLists.js';
 import { weightsRouter } from './routes/weights.js';
 import { nlpRouter } from './routes/nlp.js';
 import { authRouter } from './routes/auth.js';
+import { hydrationRouter } from './routes/hydration.js';
 
 const app = express();
 
@@ -62,6 +63,7 @@ app.use('/users', usersRouter);
 app.use('/recipes', recipesRouter);
 app.use('/shopping-lists', shoppingListsRouter);
 app.use('/weights', weightsRouter);
+app.use('/hydration', hydrationRouter);
 app.use('/nlp', nlpRouter);
 
 app.use(notFound);

@@ -163,6 +163,17 @@ class AppTheme {
       ),
       splashFactory: InkRipple.splashFactory,
       extensions: const <ThemeExtension<dynamic>>[tokens],
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: Colors.white,
+        behavior: SnackBarBehavior.floating,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: tokens.textPrimary,
+        ),
+        actionTextColor: tokens.accentPrimary,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(tokens.radius),
+        ),
+      ),
     );
   }
 }

@@ -22,6 +22,7 @@ model User {
   chatMessages  ChatMessage[]
   weightEntries WeightEntry[]
   healthProfile HealthProfile?
+  hydrationState HydrationState?
 }
 
 model Recipe {
@@ -146,4 +147,16 @@ model HealthProfile {
   medicalConditions  String?
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
+}
+
+model HydrationState {
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String   @unique
+  consumedMl  Int      @default(0)
+  dailyGoalMl Int      @default(2000)
+  lastResetAt DateTime @default(now())
+  lastIntakeAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

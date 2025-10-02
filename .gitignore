@@ -28,5 +28,6 @@ uploads/
 
 # Firebase / secrets
 *.json
+!assets/lottie/*.json
 *.plist
 .env

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:coachnutri/features/hydration/hydration_screen.dart';
+
 import 'my_recipes_page.dart';
 import 'shopping_list_page.dart';
 
@@ -8,32 +10,41 @@ class RecipesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       children: [
-          _ActionCard(
-            color: const Color(0xFFE7E4FF),
-            icon: Icons.menu_book_rounded,
-            title: 'Mes recettes',
-            subtitle: 'Toutes tes recettes générées',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const MyRecipesPage()),
-            ),
+        _ActionCard(
+          color: const Color(0xFFE7E4FF),
+          icon: Icons.menu_book_rounded,
+          title: 'Mes recettes',
+          subtitle: 'Toutes tes recettes générées',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const MyRecipesPage()),
           ),
-          const SizedBox(height: 12),
-          _ActionCard(
-            color: const Color(0xFFFFF1C6),
-            icon: Icons.list_alt_rounded,
-            title: 'Liste de courses',
-            subtitle: 'Bring‑like avec regroupement par rayon',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ShoppingListPage()),
-            ),
+        ),
+        const SizedBox(height: 12),
+        _ActionCard(
+          color: const Color(0xFFFFF1C6),
+          icon: Icons.list_alt_rounded,
+          title: 'Liste de courses',
+          subtitle: 'Bring‑like avec regroupement par rayon',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ShoppingListPage()),
           ),
-          // Grille visible sur la page dédiée "Mes recettes"
-        ],
-      );
+        ),
+        const SizedBox(height: 12),
+        _ActionCard(
+          color: const Color(0xFFD6F5FF),
+          icon: Icons.water_drop_rounded,
+          title: 'Hydratation',
+          subtitle: 'Fais pousser ta plante du jour',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const HydrationScreen()),
+          ),
+        ),
+        // Grille visible sur la page dédiée "Mes recettes"
+      ],
+    );
   }
 }
 
