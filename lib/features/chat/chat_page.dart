@@ -262,19 +262,40 @@ class _ChatPageState extends State<ChatPage> {
             final count = titles.length;
             final accepted = await _confirmAddRecipes(context, count, titles.take(3).toList());
             if (accepted == true) {
-              ChatHooks.processStructuredPayloadFromReply(
+              final hookMessage = await ChatHooks.processStructuredPayloadFromReply(
                 reply: response.reply,
                 userId: userId,
                 tokenProvider: tokenProvider,
               );
+              if (hookMessage != null && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(hookMessage)),
+                );
+              }
             }
           } else if (type == 'shopping_list_update') {
             // Apply shopping ops silently (no popup), but without showing JSON in chat
-            ChatHooks.processStructuredPayloadFromReply(
+            final hookMessage = await ChatHooks.processStructuredPayloadFromReply(
               reply: response.reply,
               userId: userId,
               tokenProvider: tokenProvider,
             );
+            if (hookMessage != null && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(hookMessage)),
+              );
+            }
+          } else if (type == 'weight_log') {
+            final hookMessage = await ChatHooks.processStructuredPayloadFromReply(
+              reply: response.reply,
+              userId: userId,
+              tokenProvider: tokenProvider,
+            );
+            if (hookMessage != null && mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(hookMessage)),
+              );
+            }
           }
         }
       } catch (error, stackTrace) {
@@ -432,19 +453,28 @@ class _ChatPageState extends State<ChatPage> {
       }
       final position = _scrollController.position;
       final target = position.maxScrollExtent;
-      if ((position.pixels - target).abs() < 4) {
+      if ((position.pixels - target).abs() < 2) {
         return;
       }
       Logger.i('CHAT_SCROLL', 'Auto scroll attempt $attempt to $target');
       _scrollController
           .animateTo(
             target,
-            duration: const Duration(milliseconds: 260),
+            duration: const Duration(milliseconds: 280),
             curve: Curves.easeOutCubic,
           )
           .catchError((Object error, StackTrace stackTrace) {
             Logger.e('CHAT_SCROLL', 'Scroll failed', error, stackTrace);
-          });
+          })
+          .whenComplete(() {
+        if (!mounted) return;
+        if (attempt < 6) {
+          Future.delayed(
+            const Duration(milliseconds: 60),
+            () => _scrollToBottom(attempt: attempt + 1),
+          );
+        }
+      });
     });
   }
 }

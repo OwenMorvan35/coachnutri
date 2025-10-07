@@ -20,6 +20,10 @@ class AddWeightSheet extends StatefulWidget {
     return showModalBottomSheet<AddWeightSheetResult>(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (context) => const AddWeightSheet._(),
     );
   }
@@ -59,67 +63,80 @@ class _AddWeightSheetState extends State<AddWeightSheet> {
       padding: EdgeInsets.only(bottom: viewInsets.bottom),
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text('Nouvelle mesure', style: theme.textTheme.titleLarge),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.of(context).pop(),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('Nouvelle mesure', style: theme.textTheme.titleLarge),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _weightController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    labelText: 'Poids (kg)',
+                    hintText: 'Ex: 72,4',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_today_rounded),
+                  title: const Text('Date'),
+                  subtitle: Text(dateLabel),
+                  onTap: _pickDate,
+                ),
+                TextField(
+                  controller: _noteController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Note (optionnel)',
+                    hintText: 'Ex: après la séance de sport',
+                  ),
+                  maxLines: 3,
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _weightController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Poids (kg)',
-                  hintText: 'Ex: 72,4',
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.check_rounded),
+                    label: const Text('Enregistrer'),
+                    onPressed: _submit,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.calendar_today_rounded),
-                title: Text('Date'),
-                subtitle: Text(dateLabel),
-                onTap: _pickDate,
-              ),
-              TextField(
-                controller: _noteController,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Note (optionnel)',
-                  hintText: 'Ex: après la séance de sport',
-                ),
-                maxLines: 3,
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _error!,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
-                ),
+                const SizedBox(height: 8),
               ],
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  icon: const Icon(Icons.check_rounded),
-                  label: const Text('Enregistrer'),
-                  onPressed: _submit,
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         ),
       ),

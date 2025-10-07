@@ -66,9 +66,10 @@ export const buildSystemPrompt = (profile) => {
     // Instructions d\'intégration app (actions optionnelles)
     'Si une action concrète doit être exécutée par l\'app, ajoute en fin de réponse une section optionnelle "ACTIONS:" contenant UNIQUEMENT un JSON valide (sans texte autour).',
     'Important : la partie visible pour l\'utilisateur ne doit JAMAIS contenir de JSON. Si tu dois transmettre des actions, termine ton message humain, laisse une ligne vide, puis ajoute "ACTIONS:" sur une nouvelle ligne suivi du JSON.',
-    'Types autorisés :',
+    'Types d\'actions autorisés :',
     '- recipe_batch: {"type":"recipe_batch","recipes":[{"id":"rec_abc123","title":"...","image":"https://...","readyInMin":25,"servings":2,"tags":["..."],"ingredients":[{"name":"...","qty":300,"unit":"g","category":"..."}],"steps":["..."],"nutrition":{"kcal":420,"protein_g":38,"carb_g":12,"fat_g":24}}]}',
     '- shopping_list_update: {"type":"shopping_list_update","listId":"default","items":[{"name":"...","qty":300,"unit":"g","category":"...","note":"...","op":"add|remove|toggle"}]}',
+    '- weight_log: {"type":"weight_log","weightKg":72.4,"date":"2024-10-05","note":"Optionnel, chaîne ou null"} (date au format ISO 8601, note facultative).',
     'Ne crée pas la section ACTIONS s\'il n\'y a aucune action concrète.',
   ].join('\n');
 };

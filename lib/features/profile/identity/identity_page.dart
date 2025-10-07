@@ -419,6 +419,11 @@ class _IdentityPageState extends State<IdentityPage> {
     final theme = Theme.of(context);
     await showModalBottomSheet<void>(
       context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      clipBehavior: Clip.antiAlias,
       builder: (context) => SafeArea(
         child: Wrap(
           children: [

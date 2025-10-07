@@ -8,6 +8,8 @@ import '../../recipes/services/shopping_list_repository.dart';
 import '../../recipes/services/recipe_api.dart';
 import '../../recipes/services/shopping_api.dart';
 import '../../recipes/utils.dart';
+import '../../weight/services/weight_api.dart';
+import '../../weight/services/weight_repository.dart';
 
 class ChatHooks {
   ChatHooks._();
@@ -60,13 +62,13 @@ class ChatHooks {
     return obj;
   }
 
-  static void processStructuredPayloadFromReply({
+  static Future<String?> processStructuredPayloadFromReply({
     required String reply,
     required String userId,
     String? Function()? tokenProvider,
-  }) {
+  }) async {
     final Map<String, dynamic>? obj = _extractJsonObject(reply);
-    if (obj == null) return;
+    if (obj == null) return null;
     final type = (obj['type'] as String? ?? '').trim();
     if (type == 'recipe_batch') {
       final List<dynamic> rawRecipes = (obj['recipes'] as List?) ?? const [];
@@ -120,7 +122,7 @@ class ChatHooks {
           }).catchError((_) {});
         } catch (_) {}
       }
-      return;
+      return null;
     }
 
     if (type == 'shopping_list_update') {
@@ -139,7 +141,50 @@ class ChatHooks {
           }).catchError((_) {});
         } catch (_) {}
       }
-      return;
+      return null;
     }
+
+    if (type == 'weight_log') {
+      final weightValue = (obj['weightKg'] as num?)?.toDouble();
+      final dateRaw = obj['date'];
+      final note = (obj['note'] as String?)?.trim();
+      if (weightValue == null || dateRaw == null) {
+        return null;
+      }
+
+      DateTime? parsedDate;
+      if (dateRaw is String && dateRaw.isNotEmpty) {
+        try {
+          parsedDate = DateTime.parse(dateRaw);
+        } catch (_) {}
+      } else if (dateRaw is num) {
+        parsedDate = DateTime.fromMillisecondsSinceEpoch(dateRaw.toInt(), isUtc: true);
+      }
+      parsedDate ??= DateTime.now();
+
+      if (tokenProvider == null) {
+        return null;
+      }
+
+      try {
+        final api = WeightApi(tokenProvider: tokenProvider);
+        final entry = await api.createEntry(
+          weightKg: weightValue,
+          date: parsedDate,
+          note: note,
+        );
+        WeightRepository.instance.applyServerEntry(entry);
+
+        final localDate = entry.date.toLocal();
+        final formattedDate =
+            '${localDate.day.toString().padLeft(2, '0')}/${localDate.month.toString().padLeft(2, '0')}/${localDate.year}';
+        final weightText = entry.weightKg.toStringAsFixed(1).replaceAll('.', ',');
+        return 'Poids enregistré : $weightText kg (le $formattedDate).';
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return null;
   }
 }

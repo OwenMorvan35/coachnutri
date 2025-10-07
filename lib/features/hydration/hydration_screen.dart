@@ -69,51 +69,56 @@ class _HydrationScreenState extends State<HydrationScreen> {
               return Padding(
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
                 child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '$percentLabel% d\'hydratation',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Objectif ${goalLiters.toStringAsFixed(1)} L · Ingesté ${consumedLiters.toStringAsFixed(2)} L',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(32),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 20,
-                            offset: const Offset(0, 12),
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$percentLabel% d\'hydratation',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Objectif ${goalLiters.toStringAsFixed(1)} L · Ingesté ${consumedLiters.toStringAsFixed(2)} L',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
                           ),
                         ],
                       ),
-                      child: const PlantWidget(),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface,
+                          borderRadius: BorderRadius.circular(32),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 20,
+                              offset: const Offset(0, 12),
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.9,
+                            child: PlantWidget(),
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 24),
                   Row(
                     children: [
